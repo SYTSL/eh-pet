@@ -582,6 +582,7 @@ class PetSprite {
   }
 
   playOnce(name, playbackId, url) {
+    this.stealingCocoa = false;
     this.anim = name;
     this.once = true;
     this.switchTo(name, true, playbackId, url);
@@ -664,7 +665,7 @@ class PetSprite {
     // 占用锁：锁生效时不掷骰。这里是随机链的唯一入口（动画播完才会走到），一句判断就把随机动画、
     // 随机转向与自主走位一起停住——宠物停在最后一帧，等持锁者的下一条指令（走 /anim，不经这里）。
     if (this.frozen) return;
-    if (!skipSnack && this.assetRoot === 'eh' && this.playItemAction && this.anim !== '偷吃' && Math.random() < .05) {
+    if (!skipSnack && this.assetRoot === 'eh' && this.playItemAction && this.anim !== '偷吃' && this.anim !== '吃可可果' && Math.random() < .05) {
       const previous = this.anim;
       void this.playItemAction('steal').then((played) => {
         if (!played && this.anim === previous && !this.dragState.active && !this.ac.signal.aborted) this.playIdle(true);
@@ -1552,6 +1553,12 @@ class PetSprite {
   onClick(e) {
     const d = this.dragState;
     if (d.active || d.dragging || this.justDragged) return;
+    if (this.stealingCocoa && this.anim === '吃可可果' && !this.stagedAction && !isOpenShortcut(e)) {
+      this.stopThrow();
+      this.stopMove();
+      this.playOnce('偷吃');
+      return;
+    }
     // Ctrl（macOS 为 Cmd）+ 左键 = 呼出 DSH：与菜单「打开网站」同一动作，只是快捷键——
     // 不播点击动画、也不参与积分，避免「摸一下宠物」变成「开窗口」。
     if (isOpenShortcut(e)) {
@@ -1605,6 +1612,22 @@ class PetSprite {
     const d = this.dragState;
     if (d.active || d.dragging || this.justDragged || this.menuOpen || this.menuLoading) return;
     e.preventDefault();
+    if (this.stagedAction?.kind === 'music' || (this.musicAudio?.src && !this.musicAudio.paused)) {
+      await this.openHeadFeature('music');
+      return;
+    }
+    if (this.stagedAction?.kind === 'mine') {
+      if (this.stagedAction.phase !== 'outro') {
+        const box = this.makeHead('挖矿', 'mining-controls');
+        box.onclick = null;
+        const stop = document.createElement('button');
+        stop.textContent = '结束挖矿';
+        stop.onclick = () => { this.closeHead(); this.stopMining(true, true); };
+        box.append(stop);
+        this.layoutHead();
+      }
+      return;
+    }
     this.stopThrow(); // 菜单弹出前停住飞行中的宠物
     this.stopMove(); // 菜单悬停期间宠物不漫游
     this.menuLoading = true;
@@ -1630,6 +1653,7 @@ class PetSprite {
       { label: '抽签', action: 'fortune' },
       { label: '天气查询', action: 'weather' },
       { label: '设置', action: 'deepseek-token' },
+      { label: '检查更新', action: 'check-update' },
       { label: '商店', action: 'shop' },
       { label: '背包', action: 'bag' },
     );
@@ -1692,6 +1716,10 @@ class PetSprite {
   onMenuAction(leaf, keepFacing) {
     this.closeMenu();
     if (!leaf || typeof leaf !== 'object') return;
+    if (leaf.action === 'check-update') {
+      void this.headRequest('check-update').catch(error => this.headText(error.message));
+      return;
+    }
     if (leaf.action === 'delete-pet') {
       this.headRequest('confirm-delete').then(async answer=>{
         if(!answer.confirmed)return;

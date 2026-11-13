@@ -291,7 +291,7 @@
       return;
     }
     click.call(this, event);
-    if (this.stagedAction?.kind === 'mine') return;
+    if (this.stagedAction?.kind === 'mine' || this.anim === '偷吃') return;
     if (!event.ctrlKey && !event.metaKey && this.prefs?.chatter && (!this.headMode || this.headMode === 'message'))
       this.headText(nextPhrase());
   };
@@ -667,7 +667,7 @@
     if (action === 'mine') return this.toggleMining();
     if (this.itemActionPending || this.assetRoot !== 'eh' || this.stagedAction || this.dragState.active ||
         this.waterPending || this.frozen || this.ac.signal.aborted) return false;
-    const animation = {feed:'吃可可果', steal:'偷吃'}[action];
+    const animation = '吃可可果';
     this.itemActionPending = true;
     const previous = this.anim;
     try {
@@ -677,6 +677,7 @@
       this.stopMove();
       this.stopThrow();
       this.playOnce(animation);
+      this.stealingCocoa = action === 'steal';
       return true;
     } catch (error) {
       if (action !== 'steal') this.headText(error.message);
@@ -733,7 +734,11 @@
     this.stagedAction = null;
     if (this.headMode === 'mining-emoji') this.closeHead();
     if (!alreadyStopped) {
-      void this.headRequest('mining-stop').catch(error => console.warn('[eh] 挖矿结算失败', error));
+      void this.headRequest('mining-stop').then(({total}) => {
+        if (!this.ac.signal.aborted && !this.waterPending && (!this.headMode || this.headMode === 'message')) {
+          this.headText(`本次挖到 ${total} 颗绿宝石`);
+        }
+      }).catch(error => console.warn('[eh] 挖矿结算失败', error));
     }
     if (playOutro && !alreadyStopped) {
       this.stagedPlay('mine', 'outro');

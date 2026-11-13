@@ -72,28 +72,30 @@ function installCompanion() {
     const petPage = pathToFileURL(path.join(__dirname, 'index.html')).href;
     if ((!win || event.sender !== win.webContents) && senderFile !== petPage) throw new Error('Unauthorized window');
     try {
+      if (action === 'check-update') return await require('./updates.js').checkUpdate();
       if (['shop-status', 'shop-buy', 'pet-item-action'].includes(action)) return shopRequest(action, input);
       if (action === 'mining-start') {
         shopRequest('pet-item-action', 'mine');
-        if (!mining.has(event.sender)) mining.set(event.sender, performance.now());
+        if (!mining.has(event.sender)) mining.set(event.sender, {started:performance.now(), total:0});
         return { ok: true };
       }
       if (action === 'mining-tick' || action === 'mining-stop') {
-        const started = mining.get(event.sender);
+        const session = mining.get(event.sender);
         let earned = 0;
-        if (started !== undefined) {
-          const minutes = Math.floor((performance.now() - started) / 60000);
+        if (session) {
+          const minutes = Math.floor((performance.now() - session.started) / 60000);
           try {
             for (let minute = 0; minute < minutes; minute++) earned += randomInt(15, 31);
             if (earned) {
               rewardEmeralds(earned);
-              mining.set(event.sender, started + minutes * 60000);
+              session.started += minutes * 60000;
+              session.total += earned;
             }
           } finally {
             if (action === 'mining-stop') mining.delete(event.sender);
           }
         }
-        return { ok: true, earned };
+        return { ok: true, earned, total:session?.total ?? 0 };
       }
       const settings = read();
       if (action === 'startup') {

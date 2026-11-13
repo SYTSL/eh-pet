@@ -1,0 +1,18 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'self';img-src 'self' data:;script-src 'self';style-src 'self' 'unsafe-inline';media-src file: 'self'"><title>桌面弹弓</title><style>
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:transparent;user-select:none;font:14px/1.5 'Microsoft YaHei',sans-serif}canvas{position:absolute;inset:0}#bar{position:absolute;left:24px;top:18px;max-width:calc(100% - 80px);padding:12px 16px;border:1px solid #ccd9c0;border-radius:18px;background:#fffaf2f5;box-shadow:0 3px 16px #35482922;color:#36513b}button{font:inherit;border:0;border-radius:9px;padding:7px 12px;margin-right:6px;color:#355139;background:#e2ecd9;cursor:pointer}#status{margin:8px 0 0}video{display:none}
+.sizes{display:flex;flex-wrap:wrap;gap:12px 24px;margin-top:12px;padding-top:10px;border-top:1px solid #e1e8d9}.sizes label{display:grid;grid-template-columns:70px 130px 42px;align-items:center;gap:8px;font-size:13px}.sizes input{width:130px;accent-color:#5b8265}.sizes output{text-align:right;color:#75836d}.sizes input:disabled{opacity:.45}#object-size{position:absolute;z-index:5;background:#fffaf2fa;border:1px solid #ccd9c0;border-radius:14px;padding:12px 14px;box-shadow:0 3px 18px #35482928;color:#36513b;width:260px;box-sizing:border-box}#object-size[hidden]{display:none}#size-title{font-weight:600}#size-close{float:right;margin:0;padding:0 7px}#object-size>div{display:flex;align-items:center;gap:10px;margin:10px 0 3px}#size-slider{width:175px;accent-color:#5b8265}#size-value{min-width:42px}#size-hint{font-size:11px;color:#798571}#build-tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}#build-tools input,#build-tools select{font:inherit;max-width:120px}button:disabled{opacity:.45;cursor:default}#bar{padding:10px 12px;border-radius:14px}
+.game-controls{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.game-controls button{margin:0;padding:5px 9px}
+.game-controls b{margin-right:4px}
+.game-controls .primary{background:#52745a;color:#fff}
+.game-controls input,.game-controls select{font:inherit;width:112px;padding:4px 6px;border:1px solid #d5dfce;border-radius:7px;background:#fffdf7;color:#36513b}
+.tools{margin-top:7px;padding-top:7px;border-top:1px solid #e6ebdf}
+#build-tools{margin:0}
+#build-tools[hidden]{display:none}
+#status{font-size:12px;margin-top:6px}</style></head><body><canvas id="scene"></canvas><div id="bar">
+ <div class="game-controls"><b>桌面弹弓</b><button id="mode" class="primary">开始发射</button><select id="map-list" aria-label="已保存地图"></select><button id="load-map">载入</button><button id="exit">退出 · Esc</button></div>
+ <div class="game-controls tools"><button id="add">添加猪头</button><button id="reset">重置场景</button><div id="build-tools" class="game-controls"><button id="add-beam">添加木棍</button><button id="delete-beam" disabled>移除木棍</button><input id="map-name" maxlength="40" placeholder="地图名" aria-label="地图名"><button id="save-map">保存地图</button></div></div>
+ <p id="status"></p>
+</div><div id="object-size" hidden><label id="size-title" for="size-slider">调整大小</label><button id="size-close" aria-label="关闭大小调节">×</button><div><input id="size-slider" type="range" min="50" max="800" step="10"><output id="size-value"></output></div><small id="size-hint"></small></div><video id="pet" autoplay loop muted playsinline></video><script src="desktop-game-ui.js"></script></body></html>
+
+

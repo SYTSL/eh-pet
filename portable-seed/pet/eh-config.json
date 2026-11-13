@@ -1,0 +1,88 @@
+{
+  "pets": [
+    {
+      "id": "eh",
+      "name": "eh",
+      "size": 462,
+      "balanceEnabled": false,
+      "whisperEnabled": false,
+      "workStatusEnabled": false,
+      "fixedEnabled": false,
+      "display": "desktop",
+      "position": {
+        "corner": "bottom-right",
+        "marginX": 40,
+        "marginY": 30
+      }
+    }
+  ],
+  "animations": {
+    "idle": [
+      "待机2"
+    ],
+    "turn": [],
+    "drag": [
+      "zhuai-loop"
+    ],
+    "clicks": [
+      "眯一会",
+      "angry",
+      "打招呼",
+      "高兴",
+      "还好",
+      "惊讶"
+    ],
+    "moves": {
+      "default": {
+        "minDist": 160,
+        "maxDist": 460,
+        "margin": 20,
+        "leadSec": 1,
+        "tailSec": 2
+      },
+      "actions": [
+        {
+          "name": "跑动"
+        }
+      ]
+    },
+    "categories": [
+      {
+        "id": "坐下",
+        "weight": 100,
+        "actions": [
+          "坐下"
+        ]
+      },
+      {
+        "id": "睡觉",
+        "weight": 100,
+        "noMirror": true,
+        "actions": [
+          "眯一会"
+        ]
+      }
+    ],
+    "events": {
+      "balance": [
+        "待机2"
+      ],
+      "whisper": [
+        "待机2"
+      ],
+      "workStatus": [
+        "待机2",
+        "待机2",
+        "待机2",
+        "待机2",
+        "待机2",
+        "待机2"
+      ]
+    }
+  },
+  "animationWeights": {
+    "idle": 65,
+    "turn": 0,
+    "move": 15
+  }
+}

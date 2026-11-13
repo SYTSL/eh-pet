@@ -1,0 +1,8 @@
+/data/
+/音乐/
+*.zip
+*.exe
+*.log
+.env*
+wallet.json
+companion-settings.json

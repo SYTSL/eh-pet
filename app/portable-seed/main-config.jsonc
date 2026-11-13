@@ -1,0 +1,19 @@
+{
+  "pets": [
+    {
+      "id": "main",
+      "name": "原桌宠",
+      "size": 462,
+      "balanceEnabled": false,
+      "whisperEnabled": false,
+      "workStatusEnabled": false,
+      "fixedEnabled": false,
+      "display": "none",
+      "position": {
+        "corner": "bottom-right",
+        "marginX": 24,
+        "marginY": 30
+      }
+    }
+  ]
+}

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file:; connect-src 'none'"
+    />
+    <title>桌宠小屋</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #f6f3ed;
+        color: #283b35;
+        font:
+          15px/1.7 'Microsoft YaHei',
+          sans-serif;
+        padding: 28px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 25px;
+      }
+      small,
+      .muted {
+        color: #75837b;
+      }
+      nav {
+        display: flex;
+        gap: 8px;
+        margin: 22px 0;
+      }
+      button {
+        cursor: pointer;
+        border: 0;
+        border-radius: 12px;
+        padding: 11px 18px;
+        background: #e3e9df;
+        color: #29483b;
+        font: inherit;
+      }
+      button.active,
+      button.primary {
+        background: #3d6c57;
+        color: white;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: wait;
+      }
+      section {
+        background: white;
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 8px 28px #233c3010;
+      }
+      section[hidden] {
+        display: none;
+      }
+      input,
+      textarea,
+      select {
+        display: block;
+        width: 100%;
+        border: 1px solid #d9e2d8;
+        border-radius: 10px;
+        padding: 12px;
+        font: inherit;
+        margin: 8px 0 16px;
+        background: #fafbf8;
+      }
+      textarea {
+        resize: vertical;
+      }
+      audio {
+        width: 100%;
+        margin: 20px 0;
+      }
+      pre {
+        white-space: pre-wrap;
+        font: inherit;
+      }
+      #notice {
+        min-height: 28px;
+        margin-top: 16px;
+        color: #9a5728;
+      }
+      label {
+        display: block;
+        margin-top: 12px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>eh 的小小休息站</h1>
+    <small>听一首歌，抽一支签，慢慢来。</small>
+    <nav>
+      <button data-page="music">♫ 听歌</button><button data-page="fortune">✦ 抽签</button
+      ><button data-page="settings">Token 设置</button>
+    </nav>
+    <section id="music">
+      <h2>本地音乐</h2>
+      <p class="muted">选择电脑里的音乐，多选即可组成播放列表。</p>
+      <button id="choose">选择音乐</button
+      ><select id="tracks" aria-label="播放列表"></select
+      ><audio id="player" controls></audio>
+      <div class="row"><button id="previous">上一首</button><button id="next">下一首</button></div>
+      <small>关闭小屋窗口会停止播放。</small>
+    </section>
+    <section id="fortune" hidden>
+      <h2>摇一支今日签</h2>
+      <label>心里有什么想问的？<input id="question" maxlength="500" placeholder="留空就问问今日小运势" /></label
+      ><button class="primary" id="draw">抽一签</button>
+      <p class="muted">签号随机抽取，DeepSeek 为你写签诗与解签。仅供娱乐。</p>
+      <pre id="result"></pre>
+    </section>
+    <section id="settings" hidden>
+      <h2>DeepSeek Token</h2>
+      <p id="key-status"></p>
+      <label
+        >API Token（保存后不回显）<input
+          id="key"
+          type="password"
+          autocomplete="off"
+          placeholder="粘贴 DeepSeek API 密钥；留空保留原密钥" /></label
+      ><label>模型<input id="model" value="deepseek-flash" /></label>
+      <div class="row"><button id="save" class="primary">保存 Token</button><button id="clear">清除 Token</button></div>
+      <small>密钥加密保存在本机，仅在抽签时发送给 DeepSeek 官方接口。此处为抽签专用设置。</small>
+      <details>
+        <summary>编辑抽签提示词</summary>
+        <textarea id="prompt" rows="9"></textarea><button id="save-prompt">保存提示词</button>
+      </details>
+    </section>
+    <div id="notice" role="status" aria-live="polite"></div>
+    <script src="companion-ui.js"></script>
+  </body>
+</html>

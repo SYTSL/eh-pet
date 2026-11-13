@@ -1,4 +1,4 @@
-const { app, dialog } = require('electron');
+const { app, dialog, net, shell } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const { createHash } = require('node:crypto');
@@ -23,7 +23,7 @@ async function download(asset, tag) {
   const url = `https://github.com/${repository}/releases/download/${tag}/eh-pet-update.json`;
   if (asset.browser_download_url !== url || !/^sha256:[a-f0-9]{64}$/.test(asset.digest || '') ||
       !Number.isSafeInteger(asset.size) || asset.size <= 0 || asset.size > limit) throw new Error('更新包信息无效');
-  const response = await fetch(url, {signal:AbortSignal.timeout(120000)});
+  const response = await net.fetch(url, {signal:AbortSignal.timeout(120000)});
   if (!response.ok || !response.body) throw new Error('下载更新失败');
   const chunks = [];
   let size = 0;
@@ -80,9 +80,23 @@ async function checkUpdate() {
   updating = true;
   try {
     const current = fs.readFileSync(versionFile, 'utf8').trim();
-    const response = await fetch(`https://api.github.com/repos/${repository}/releases/latest`, {signal:AbortSignal.timeout(15000)});
-    if (!response.ok) throw new Error('暂时无法读取 GitHub 发布信息');
-    const release = await response.json();
+    let release;
+    try {
+      const response = await net.fetch(`https://api.github.com/repos/${repository}/releases/latest`, {
+        headers: {Accept:'application/vnd.github+json', 'User-Agent':'eh-pet-updater'},
+        signal:AbortSignal.timeout(15000),
+      });
+      if (!response.ok) throw new Error(`GitHub API HTTP ${response.status}`);
+      release = await response.json();
+    } catch (error) {
+      const answer = await dialog.showMessageBox({
+        type:'warning', title:'检查更新', message:'桌宠未能连接 GitHub 更新接口',
+        detail:`${error.message}\n可以用浏览器查看最新版。`,
+        buttons:['打开发布页','关闭'], cancelId:1,
+      });
+      if (answer.response === 0) await shell.openExternal(`https://github.com/${repository}/releases/latest`);
+      return {ok:true};
+    }
     const tag = release.tag_name;
     if (!newer(tag, current)) {
       await dialog.showMessageBox({title:'检查更新',message:`当前已是最新版 ${current}`});

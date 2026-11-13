@@ -1646,8 +1646,6 @@ class PetSprite {
     // 桌面专属工具根项 + 共享菜单树（动作 → 分类 → 具体动画）。碎碎念/对话无条件显示：手动触发
     // 不受 whisperEnabled 限制（该字段只影响自动轮询）。首项文案随宿主形态变：桌面宿主说「打开软件」。
     const tools = [{ label: '添加桌宠', action: 'add-pet' }, { label: '删除这只桌宠', action: 'delete-pet' }, { label: '桌面弹弓', action: 'desktop-game' }];
-    // 「查看余额」无条件显示：关了 balanceEnabled 的宠物也能点，手动请求不受开关限制，点了一定给答复。
-    tools.push({ label: '查看余额', action: 'show-balance' });
     tools.push(
       { label: '听歌（本地音乐）', action: 'local-music' },
       { label: '抽签', action: 'fortune' },
@@ -1674,7 +1672,6 @@ class PetSprite {
       // 显示位置（仅网页/仅桌面/两者/都不）：改这只宠物的 display 配置，由宿主重载生效。
       // 与浏览器端注入同一份子菜单，两端文案与取值不会漂移。不就地开关窗：窗口是进程启动时按
       // DSH_PET_PETS 一次性建的，就地增删既改不了磁盘配置也改不了窗口数量。
-      S.displayMenuBranch(),
       // 重载配置：请宿主重启桌面 Helper，全部窗口按最新配置重建。放在最后——它是维护动作。
     );
     // 第三方菜单项统一收在「更多」下：0 项不出现；某个 owner 只有 1 项时跳过 owner 那层直接平铺。

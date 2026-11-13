@@ -1651,7 +1651,7 @@ class PetSprite {
       { label: '抽签', action: 'fortune' },
       { label: '天气查询', action: 'weather' },
       { label: '设置', action: 'deepseek-token' },
-      { label: '检查更新', action: 'check-update' },
+      { label: '检查更新（v0.4.3）', action: 'check-update' },
       { label: '商店', action: 'shop' },
       { label: '背包', action: 'bag' },
     );

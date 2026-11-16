@@ -5,6 +5,8 @@ const os = require('node:os');
 const products = [
   { id: 'woodPickaxe', name: '木镐', icon: 'pickaxes.png', price: 150 },
   { id: 'cocoa', name: '可可果', icon: 'cocoa.png', price: 200 },
+  { id: 'chicken', name: '炸鸡腿', symbol: '🍗', animation: '吃炸鸡腿', price: 500 },
+  { id: 'cake', name: '蛋糕', symbol: '🍰', animation: '吃蛋糕', price: 900 },
 ];
 
 function walletFile() {
@@ -13,11 +15,12 @@ function walletFile() {
 
 function readWallet() {
   const file = walletFile();
-  if (!fs.existsSync(file)) return { emeralds: 0, woodPickaxe: 0, cocoa: 0 };
-  const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
-  return Object.fromEntries(['emeralds', 'woodPickaxe', 'cocoa'].map((key) => {
-    if (!Number.isSafeInteger(saved[key]) || saved[key] < 0) throw new Error('背包数据无效');
-    return [key, saved[key]];
+  const saved = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
+  return Object.fromEntries(['emeralds', ...products.map(({id}) => id), 'miningBoost'].map((key) => {
+    const value = saved[key] === undefined ? 0 : saved[key];
+    if (!Number.isSafeInteger(value) || value < 0 ||
+        (key === 'miningBoost' && value !== 0 && (value < 115 || value > 150))) throw new Error('背包数据无效');
+    return [key, value];
   }));
 }
 
@@ -33,6 +36,20 @@ function rewardEmeralds(count) {
   wallet.emeralds += count;
   saveWallet(wallet);
   return wallet;
+}
+
+function claimMiningBoost() {
+  const wallet = readWallet();
+  const boost = wallet.miningBoost;
+  if (boost) { wallet.miningBoost = 0; saveWallet(wallet); }
+  return boost || 100;
+}
+
+function restoreMiningBoost(boost) {
+  if (boost <= 100) return;
+  const wallet = readWallet();
+  wallet.miningBoost = Math.max(wallet.miningBoost, boost);
+  saveWallet(wallet);
 }
 
 function shopRequest(action, item) {
@@ -57,11 +74,16 @@ function shopRequest(action, item) {
         throw new Error('背包里没有可可果');
       }
       wallet.cocoa--;
+      wallet.miningBoost = Math.max(wallet.miningBoost, require('node:crypto').randomInt(115, 151));
+      saveWallet(wallet);
+    } else if (item === 'chicken' || item === 'cake') {
+      if (!wallet[item]) throw new Error('背包里没有这件食物');
+      wallet[item]--;
       saveWallet(wallet);
     } else throw new Error('未知动作');
-    return { ok: true, played: true };
+    return { ok: true, played: true, boost: wallet.miningBoost };
   }
   return { ok: true, wallet, products };
 }
 
-module.exports = { rewardEmeralds, shopRequest };
+module.exports = { rewardEmeralds, claimMiningBoost, restoreMiningBoost, shopRequest };

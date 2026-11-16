@@ -114,6 +114,12 @@
     .eh-shop-count,.eh-head .eh-shop-slot button{box-sizing:border-box;display:flex;justify-content:center;align-items:center;gap:3px;width:100%;min-height:24px;margin:4px 0 0;padding:2px;font-size:12px;font-variant-numeric:tabular-nums}
     .eh-shop-cost{width:13px;height:13px;object-fit:contain;mix-blend-mode:multiply}
     .eh-head .eh-shop-slot input[type=number]{padding:2px 3px;margin:4px 0 0;text-align:center;font-size:12px}
+    .eh-wallet-tabs{display:flex;gap:8px;margin:8px 0 12px}
+    .eh-wallet-tabs button{flex:1;margin:0}
+    .eh-wallet-tabs button[aria-pressed=true]{background:#426e54;color:#fff}
+    .eh-shop-symbol{font-size:29px;line-height:36px}
+    .eh-bag-action{display:grid;gap:4px;margin-top:4px}
+    .eh-bag-action span{font-size:11px;overflow-wrap:anywhere}
     .eh-shop-slot button:disabled{opacity:.62;cursor:default}
   `;
   document.head.appendChild(settingsStyle);
@@ -254,13 +260,17 @@
       Object.assign(this.prefs, status.preferences);
       this.prefs.lastWaterAt = Date.now();
       this.headTracks = status.tracks;
+      this.optionalMedia = status.optionalMedia || [];
       this.headStatus = status;
       this.resizeHeadPet(this.prefs.size || this.baseHeadSize);
     } catch (error) {
       console.warn('[eh] settings unavailable', error.message);
     }
     // Ordinary phrases are click-only; hydration keeps its separate timer.
-    this.headWaterTimer = setInterval(() => {
+    const tickWater = () => {
+      const due = this.prefs.lastWaterAt + 3600000;
+      if (this.prefs.water && !this.waterPending && Date.now() >= due - 15000 && Date.now() < due &&
+          this.waterAnimationDue !== due && this.beginWaterAnimation?.()) this.waterAnimationDue = due;
       if (!this.prefs.water && !this.waterPending) return;
       if (!this.waterPending && Date.now() - this.prefs.lastWaterAt >= 3600000) {
         this.waterPending = true;
@@ -273,9 +283,10 @@
         const width = Math.min(1000, baseSize * 1.75, baseSize + Math.floor((Date.now() - this.waterSince) / 5000) * 10);
         const scale = width / baseSize;
         this.resizeHeadPet(width);
-        this.headPanel.style.fontSize = 14 * scale + 'px';
+        if (this.headMode === 'water') this.headPanel.style.fontSize = 14 * scale + 'px';
       }
-    }, 1000);
+    };
+    this.headWaterTimer = setInterval(tickWater, 1000);
   };
   P.disposeHeadUI = function () {
     clearTimeout(this.headHide);
@@ -557,7 +568,7 @@
   };
   P.openWallet = async function (page) {
     const shop = page === 'shop';
-    const panel = this.makeHead(shop ? '商店' : '背包', page);
+    const panel = this.makeHead('商店/背包', page);
     panel.onclick = null;
     panel.style.fontSize = '14px';
     const balance = document.createElement('span');
@@ -574,22 +585,40 @@
     list.className = 'eh-shop-grid';
     const feedback = document.createElement('p');
     feedback.className = 'eh-feedback';
-    panel.append(list, feedback);
-    const slot = (name, icon, detail, amount) => {
+    const tabs = document.createElement('div');
+    tabs.className = 'eh-wallet-tabs';
+    for (const [target, title] of [['shop', '商店'], ['bag', '背包']]) {
+      const tab = document.createElement('button');
+      tab.textContent = title;
+      tab.setAttribute('aria-pressed', String(page === target));
+      tab.onclick = () => { if (page !== target) void this.openWallet(target); };
+      tabs.append(tab);
+    }
+    panel.append(tabs, list, feedback);
+    const slot = (name, icon, detail, amount, symbol, onItem) => {
       const tile = document.createElement('div');
       tile.className = 'eh-shop-slot';
       const preview = document.createElement('div');
       preview.className = 'eh-shop-art';
       preview.tabIndex = 0;
       preview.setAttribute('aria-label', name);
-      const art = document.createElement(icon === 'pickaxes.png' ? 'span' : 'img');
+      const art = document.createElement(symbol || icon === 'pickaxes.png' ? 'span' : 'img');
       art.className = 'eh-shop-icon';
-      if (icon === 'pickaxes.png') art.classList.add('eh-shop-pickaxe');
+      if (symbol) { art.textContent = symbol; art.classList.add('eh-shop-symbol'); }
+      else if (icon === 'pickaxes.png') art.classList.add('eh-shop-pickaxe');
       else { art.src = './shop-assets/' + icon; art.alt = ''; }
       const label = document.createElement('span');
       label.className = 'eh-shop-name';
       label.textContent = name;
       preview.append(art, label);
+      if (onItem) {
+        preview.setAttribute('aria-haspopup', 'true');
+        preview.addEventListener('contextmenu', onItem);
+        preview.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ' || event.key === 'ContextMenu' ||
+              (event.shiftKey && event.key === 'F10')) onItem(event);
+        });
+      }
       tile.append(preview);
       if (amount) tile.append(amount);
       tile.append(detail);
@@ -602,6 +631,30 @@
       return label;
     };
     let purchasing = false;
+    const itemMenu = (event, product, wallet) => {
+      event.preventDefault();
+      event.stopPropagation();
+      panel.querySelector('.eh-bag-action')?.remove();
+      const context = document.createElement('div');
+      context.className = 'eh-bag-action';
+      const use = document.createElement('button');
+      const pickaxe = product.id === 'woodPickaxe';
+      use.textContent = pickaxe ? (wallet.miningBoost ? '挖矿⬆' : '挖矿') : '使用';
+      use.disabled = !wallet[product.id] || !product.usable || this.assetRoot !== 'eh';
+      const hint = document.createElement('span');
+      hint.textContent = this.assetRoot !== 'eh' ? '仅 eh 可使用' : !wallet[product.id] ? '背包里还没有这件物品'
+        : !product.usable ? '进食动画待补' : pickaxe && wallet.miningBoost ? `本次收益 ×${wallet.miningBoost}%` : product.name;
+      use.onclick = async () => {
+        use.disabled = true;
+        this.closeHead();
+        const action = pickaxe ? 'mine' : product.id === 'cocoa' ? 'feed' : product.id;
+        await this.playItemAction(action);
+      };
+      context.append(use, hint);
+      event.currentTarget.closest('.eh-shop-slot').append(context);
+      use.focus();
+      this.layoutHead();
+    };
     const render = ({wallet, products}) => {
       if (this.headMode !== page || !list.isConnected) return;
       list.replaceChildren();
@@ -609,11 +662,11 @@
       balanceValue.setAttribute('aria-label', '绿宝石余额 ' + wallet.emeralds);
       for (const product of products) {
         if (!shop) {
-          slot(product.name, product.icon, quantity(wallet[product.id]));
+          slot(product.name, product.icon, quantity(wallet[product.id]), null, product.symbol, event => itemMenu(event, product, wallet));
           continue;
         }
         const buy = document.createElement('button');
-        const amount = product.id === 'cocoa' && product.price !== null ? document.createElement('input') : null;
+        const amount = product.id !== 'woodPickaxe' && product.price !== null ? document.createElement('input') : null;
         if (product.price === null) buy.textContent = '价格待定';
         else {
           const currency = document.createElement('img');
@@ -635,7 +688,7 @@
             amount.min = '1';
             amount.step = '1';
             amount.value = '1';
-            amount.setAttribute('aria-label', '可可果购买数量');
+            amount.setAttribute('aria-label', product.name + '购买数量');
             amount.addEventListener('input', updateTotal);
           }
           updateTotal();
@@ -655,7 +708,7 @@
             if (amount) amount.disabled = false;
           } finally { purchasing = false; }
         };
-        slot(product.name, product.icon, buy, amount);
+        slot(product.name, product.icon, buy, amount, product.symbol);
       }
       this.layoutHead();
     };
@@ -667,7 +720,7 @@
     if (action === 'mine') return this.toggleMining();
     if (this.itemActionPending || this.assetRoot !== 'eh' || this.stagedAction || this.dragState.active ||
         this.waterPending || this.frozen || this.ac.signal.aborted) return false;
-    const animation = '吃可可果';
+    const animation = { chicken:'吃炸鸡腿', cake:'吃蛋糕' }[action] || '吃可可果';
     this.itemActionPending = true;
     const previous = this.anim;
     try {
@@ -678,6 +731,7 @@
       this.stopThrow();
       this.playOnce(animation);
       this.stealingCocoa = action === 'steal';
+      if (action === 'feed' && result.boost && !this.headMode) this.headText(`下次挖矿收益 ×${result.boost}%`);
       return true;
     } catch (error) {
       if (action !== 'steal') this.headText(error.message);

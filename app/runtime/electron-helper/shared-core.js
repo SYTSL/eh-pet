@@ -1084,26 +1084,28 @@ const leaf = (anim) => ({
 	label: anim,
 	anim
 });
-function buildMenuTree(animations) {
+function buildMenuTree(animations, eh = false) {
 	const groups = [];
 	const pools = [
-		["待机", animations.idle],
+		["待机", eh ? [...new Set([...animations.idle, ...animations.moves.actions.map(m => m.name),
+			...(animations.categories ?? []).filter(c => ["坐下", "睡觉", "待机扩展"].includes(c.id)).flatMap(c => c.actions)])] : animations.idle],
 		["转向", animations.turn],
 		["拖拽", animations.drag],
-		["点击回应", animations.clicks],
-		["移动", animations.moves.actions.map((m) => m.name)]
+		["点击回应", eh ? animations.clicks.filter(name => name !== "眯一会") : animations.clicks],
+		["移动", eh ? [] : animations.moves.actions.map((m) => m.name)]
 	];
 	for (const [label, pool] of pools) if (pool.length) groups.push({
 		label,
 		children: pool.map(leaf)
 	});
 	const cats = (animations.categories ?? []).filter((c) => c.actions.length > 0);
-	for (const c of cats) groups.push({
+	for (const c of cats) if (!eh || !["坐下", "睡觉", "待机扩展"].includes(c.id)) groups.push({
 		label: c.id,
 		children: c.actions.map(leaf)
 	});
 	const events = animations.events ?? {};
 	for (const key of Object.keys(events)) {
+		if (key === "balance" || key === "workStatus") continue;
 		const pool = events[key] ?? [];
 		const names = [];
 		for (const slot of pool) if (typeof slot === "string") names.push(slot);

@@ -1,7 +1,11 @@
 (() => {
  const canvas=document.getElementById('scene'),ctx=canvas.getContext('2d'),video=document.getElementById('pet'),bar=document.getElementById('bar'),status=document.getElementById('status');
  const W=innerWidth,H=innerHeight;canvas.width=W;canvas.height=H;
- video.src=new URLSearchParams(location.search).get('video');video.play().catch(()=>{});
+ const input=new URLSearchParams(location.search);
+ video.src=input.get('video');
+ const loopSeconds=Number(input.get('loopSeconds'));
+ if(loopSeconds>0)video.addEventListener('timeupdate',()=>{if(video.currentTime>=loopSeconds)video.currentTime=0});
+ video.play().catch(()=>{});
  let pigScale=1,actorScale=1,slingScale=1,savedPigSizes=[];
  try{const saved=JSON.parse(localStorage.getItem('eh-game-sizes')||'{}');pigScale=Number.isFinite(saved.pig)?Math.max(.5,Math.min(2,saved.pig)):1;actorScale=Number.isFinite(saved.pet)?Math.max(.5,Math.min(8,saved.pet)):1;slingScale=Number.isFinite(saved.sling)?Math.max(.5,Math.min(8,saved.sling)):1;savedPigSizes=Array.isArray(saved.pigs)?saved.pigs:[]}catch{}
  const sling={x:Math.min(200,W*.2),y:H-160};

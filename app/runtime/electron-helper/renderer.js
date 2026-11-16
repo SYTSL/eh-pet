@@ -38,8 +38,19 @@ async function loadConfig() {
   const res = await fetch(BASE + '/config', { cache: 'no-store' });
   if (!res.ok) throw new Error(`config http ${res.status}`);
   const merged = await res.json();
+  const pets = S.flattenConfigPets(merged);
+  const eh = pets.filter(pet => (pet.assetRoot || pet.id) === 'eh');
+  if (eh.length) {
+    const { available = [] } = await window.petBridge.companionRequest('optional-media').catch(() => ({}));
+    for (const pet of eh) {
+      const { clicks, categories = [] } = pet.animations;
+      const extra = ['蹲下', '打哈欠'].filter(name => available.includes(name));
+      pet.animations = { ...pet.animations, clicks: clicks.filter(name => name !== '眯一会'),
+        categories: extra.length ? [...categories, { id: '待机扩展', weight: 100, actions: extra }] : categories };
+    }
+  }
   return {
-    pets: S.flattenConfigPets(merged),
+    pets,
     // 拖拽抛掷物理参数（顶层全局，所有宠物共用；合并器已填内置默认）
     physics: (merged && merged.main && merged.main.physics) || S.DEFAULT_PHYSICS,
     // 抛掷锁定在当前屏幕（根字段；合并器已填内置默认 false）

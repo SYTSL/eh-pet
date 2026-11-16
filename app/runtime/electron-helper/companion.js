@@ -1,11 +1,11 @@
 // Local music and fortune window. Keys stay in the main process, encrypted by the OS.
-const { app, BrowserWindow, ipcMain, dialog, safeStorage, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, net } = require('electron');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { randomInt } = require('node:crypto');
-const { rewardEmeralds, shopRequest } = require('./economy.js');
+const { rewardEmeralds, claimMiningBoost, restoreMiningBoost, shopRequest } = require('./economy.js');
 
 function installCompanion() {
   const data = path.join(process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), 'dsh-pet');
@@ -16,7 +16,14 @@ function installCompanion() {
   fs.mkdirSync(musicDir, { recursive: true });
   if (!fs.existsSync(promptFile)) fs.copyFileSync(path.join(__dirname, 'fortune-prompt.txt'), promptFile);
   let win;
-  let busy = false;
+  let fortuneInFlight;
+  const localDay = () => {
+    const now = new Date();
+    return [now.getFullYear(), now.getMonth() + 1, now.getDate()].join('-');
+  };
+  const optionalNames = ['蹲下', '打哈欠', '吃炸鸡腿', '吃蛋糕', '特殊喝水', '待机（桌面弹弓）'];
+  const hasMedia = name => fs.existsSync(path.join(data, 'pet', 'eh-animation', name + '.webm'));
+  const weatherFetch = (url, signal) => (net?.fetch ? net.fetch(url, {signal}) : fetch(url, {signal}));
   const mining = new WeakMap();
   const startupAvailable = process.platform === 'win32' && typeof app?.setLoginItemSettings === 'function';
   const startupName = 'eh桌宠';
@@ -73,10 +80,30 @@ function installCompanion() {
     if ((!win || event.sender !== win.webContents) && senderFile !== petPage) throw new Error('Unauthorized window');
     try {
       if (action === 'check-update') return await require('./updates.js').checkUpdate();
-      if (['shop-status', 'shop-buy', 'pet-item-action'].includes(action)) return shopRequest(action, input);
+      if (action === 'optional-media') return { ok:true, available:optionalNames.filter(hasMedia) };
+      if (action === 'shop-status' || action === 'shop-buy') {
+        const result = shopRequest(action, input);
+        return { ...result, products: result.products.map(product => ({
+          ...product, usable: !product.animation || hasMedia(product.animation),
+        })) };
+      }
+      if (action === 'pet-item-action') {
+        const name = { chicken:'吃炸鸡腿', cake:'吃蛋糕' }[input];
+        if (name && !hasMedia(name)) throw new Error('这个进食动作还没有素材，食物已保留');
+        return shopRequest(action, input);
+      }
       if (action === 'mining-start') {
         shopRequest('pet-item-action', 'mine');
-        if (!mining.has(event.sender)) mining.set(event.sender, {started:performance.now(), total:0});
+        if (!mining.has(event.sender)) {
+          const session = {started:performance.now(), base:0, total:0, boost:claimMiningBoost()};
+          session.cleanup = () => {
+            if (mining.get(event.sender) !== session) return;
+            mining.delete(event.sender);
+            if (!session.total) restoreMiningBoost(session.boost);
+          };
+          mining.set(event.sender, session);
+          event.sender.once?.('destroyed', session.cleanup);
+        }
         return { ok: true };
       }
       if (action === 'mining-tick' || action === 'mining-stop') {
@@ -85,14 +112,21 @@ function installCompanion() {
         if (session) {
           const minutes = Math.floor((performance.now() - session.started) / 60000);
           try {
-            for (let minute = 0; minute < minutes; minute++) earned += randomInt(15, 31);
+            let base = session.base;
+            for (let minute = 0; minute < minutes; minute++) base += randomInt(15, 31);
+            const total = Math.round(base * session.boost / 100);
+            earned = total - session.total;
             if (earned) {
               rewardEmeralds(earned);
               session.started += minutes * 60000;
-              session.total += earned;
+              session.base = base;
+              session.total = total;
             }
           } finally {
-            if (action === 'mining-stop') mining.delete(event.sender);
+            if (action === 'mining-stop') {
+              event.sender.removeListener?.('destroyed', session.cleanup);
+              session.cleanup();
+            }
           }
         }
         return { ok: true, earned, total:session?.total ?? 0 };
@@ -146,16 +180,21 @@ function installCompanion() {
           .trim()
           .slice(0, 80);
         if (!city) throw new Error('先在设置里填写天气城市吧');
-        const geo = await fetch(
-          'https://geocoding-api.open-meteo.com/v1/search?count=1&language=zh&name=' + encodeURIComponent(city),
-          { signal: AbortSignal.timeout(15000) },
-        );
-        if (!geo.ok) throw new Error('城市查询暂不可用');
-        const location = (await geo.json()).results?.[0];
-        if (!location) throw new Error('没找到这个城市，试试城市英文名');
-        const response = await fetch(
+        const signal = AbortSignal.timeout(18000);
+        const normalized = city.replace(/，/g, ',');
+        const names = [...new Set([normalized, normalized.replace(/市(?=,|$)/, ''), ...city.split(/\s*[／/]\s*/)].filter(Boolean))];
+        let location;
+        for (const name of names) {
+          const geo = await weatherFetch('https://geocoding-api.open-meteo.com/v1/search?count=5&language=zh&name=' + encodeURIComponent(name), signal);
+          if (!geo.ok) throw new Error('城市查询暂不可用（' + geo.status + '）');
+          const results = (await geo.json()).results || [];
+          location = results.find(place => place.name === name) || results[0];
+          if (location) break;
+        }
+        if (!location) throw new Error('没找到这个城市，试试拼音或英文名');
+        const response = await weatherFetch(
           `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current=temperature_2m,apparent_temperature,weather_code&timezone=auto`,
-          { signal: AbortSignal.timeout(15000) },
+          signal,
         );
         if (!response.ok) throw new Error('天气服务暂不可用');
         const current = (await response.json()).current;
@@ -164,6 +203,7 @@ function installCompanion() {
         const sky =
           code === 0
             ? '晴天 ☀'
+            : code == null ? '天气状况未知'
             : code <= 3
               ? '多云 ☁'
               : code <= 48
@@ -179,7 +219,7 @@ function installCompanion() {
                         : '雷雨 ⛈';
         return {
           ok: true,
-          text: `${location.name} · ${sky}\n气温 ${current.temperature_2m}°C，体感 ${current.apparent_temperature}°C\n更新 ${current.time.replace('T', ' ')}（当地时间）\n天气来源 Open-Meteo`,
+          text: `${location.name} · ${sky}\n气温 ${current.temperature_2m}°C，体感 ${current.apparent_temperature}°C\n更新 ${String(current.time || '').replace('T', ' ')}（当地时间）\n天气来源 Open-Meteo`,
         };
       }
       if (action === 'status')
@@ -187,6 +227,7 @@ function installCompanion() {
           ok: true,
           preferences: { ...settings.preferences, autoStart: startupEnabled() },
           startupAvailable,
+          optionalMedia: optionalNames.filter(hasMedia),
           hasKey: !!settings.encryptedKey,
           model: settings.model || 'deepseek-flash',
           prompt: fs.readFileSync(promptFile, 'utf8'),
@@ -227,11 +268,13 @@ function installCompanion() {
         return { ok: true };
       }
       if (action === 'fortune') {
-        if (busy) throw new Error('正在解签，请稍候');
+        const day = localDay();
+        if (settings.dailyFortune?.day === day && typeof settings.dailyFortune.text === 'string')
+          return { ok:true, text:settings.dailyFortune.text };
+        if (fortuneInFlight?.day === day) return await fortuneInFlight.promise;
         if (!settings.encryptedKey) throw new Error('请先到「Token 设置」填写 DeepSeek API Token');
         if (typeof input !== 'string' || input.length > 500) throw new Error('问题请控制在 500 字以内');
-        busy = true;
-        try {
+        const promise = (async () => {
           const number = randomInt(1, 101);
           const levels = ['上上签', '上签', '中上签', '中签', '小吉签'];
           const level = levels[randomInt(levels.length)];
@@ -269,10 +312,13 @@ function installCompanion() {
           const body = await response.json();
           const text = body.choices?.[0]?.message?.content;
           if (!text) throw new Error('没有收到解签内容，请重试');
-          return { ok: true, text: `第 ${number} 签 · ${level}\n\n${text}` };
-        } finally {
-          busy = false;
-        }
+          const result = `第 ${number} 签 · ${level}\n\n${text}`;
+          write({ ...read(), dailyFortune: {day, text:result} });
+          return { ok: true, text:result };
+        })();
+        fortuneInFlight = {day, promise};
+        try { return await promise; }
+        finally { if (fortuneInFlight?.promise === promise) fortuneInFlight = undefined; }
       }
       throw new Error('未知操作');
     } catch (error) {

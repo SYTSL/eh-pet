@@ -1617,6 +1617,7 @@ class PetSprite {
       return;
     }
     if (this.stagedAction?.kind === 'mine') {
+      if (this.waterPending) return;
       if (this.stagedAction.phase !== 'outro') {
         const box = this.makeHead('挖矿', 'mining-controls');
         box.onclick = null;
@@ -1645,15 +1646,18 @@ class PetSprite {
     if (this.ac.signal.aborted || this.menuOpen) return;
     // 桌面专属工具根项 + 共享菜单树（动作 → 分类 → 具体动画）。碎碎念/对话无条件显示：手动触发
     // 不受 whisperEnabled 限制（该字段只影响自动轮询）。首项文案随宿主形态变：桌面宿主说「打开软件」。
-    const tools = [{ label: '添加桌宠', action: 'add-pet' }, { label: '删除这只桌宠', action: 'delete-pet' }, { label: '桌面弹弓', action: 'desktop-game' }];
+    const tools = [{ label: '添加桌宠', action: 'add-pet' }, { label: '删除这只桌宠', action: 'delete-pet' }];
     tools.push(
-      { label: '听歌（本地音乐）', action: 'local-music' },
-      { label: '抽签', action: 'fortune' },
-      { label: '天气查询', action: 'weather' },
+      { label: '角色互动', children: [
+        { label: '桌面弹弓', action: 'desktop-game' },
+        { label: '听歌（本地音乐）', action: 'local-music' },
+        { label: '抽签', action: 'fortune' },
+        { label: '天气查询', action: 'weather' },
+        { label: '对话', action: 'chat' },
+      ] },
       { label: '设置', action: 'deepseek-token' },
-      { label: '检查更新（v0.4.3）', action: 'check-update' },
-      { label: '商店', action: 'shop' },
-      { label: '背包', action: 'bag' },
+      { label: '检查更新（v0.4.4）', action: 'check-update' },
+      { label: '商店/背包', action: 'shop' },
     );
     if (characters.length) {
       tools.push({
@@ -1666,8 +1670,6 @@ class PetSprite {
       });
     }
     tools.push(
-      { label: '碎碎念', action: 'whisper' },
-      { label: '对话', action: 'chat' },
       { label: '回到初始位置', action: 'home' },
       // 显示位置（仅网页/仅桌面/两者/都不）：改这只宠物的 display 配置，由宿主重载生效。
       // 与浏览器端注入同一份子菜单，两端文案与取值不会漂移。不就地开关窗：窗口是进程启动时按
@@ -1677,14 +1679,7 @@ class PetSprite {
     // 第三方菜单项统一收在「更多」下：0 项不出现；某个 owner 只有 1 项时跳过 owner 那层直接平铺。
     // 放在整棵动作树之后——「更多」不插在工具项与动作之间。
     const more = S.buildMoreBranch(this.menuItems);
-    const tree = tools.concat(S.buildMenuTree(this.animations), more ? [more] : []);
-    if (this.assetRoot === 'eh') {
-      const mining = this.stagedAction?.kind === 'mine' ? this.stagedAction.phase : null;
-      const itemActions = [{ label: mining === 'outro' ? '正在收镐' : mining ? '停止挖矿' : '挖矿', action: 'mine' }, { label: '投喂可可果', action: 'feed' }];
-      const actions = tree.find((item) => item.label === '动作');
-      if (actions?.children) actions.children.push(...itemActions);
-      else tree.push({ label: '动作', children: itemActions });
-    }
+    const tree = tools.concat(S.buildMenuTree(this.animations, this.assetRoot === 'eh'), more ? [more] : []);
     if (!tree.length) return;
     this.menuOpen = true;
     this.setInteractive(true); // 菜单是窗口内 DOM：悬停期间整窗保持可交互，关闭后恢复命中区穿透
@@ -1728,7 +1723,7 @@ class PetSprite {
     if (leaf.action === 'desktop-game') {
       this.stopMining?.(true);
       this.stopMove(); this.stopThrow(); this.closeHead();
-      window.petBridge.startDesktopGame({ video: (this.front === 0 ? this.videoA : this.videoB).currentSrc || this.videoA.src })
+      window.petBridge.startDesktopGame({ video: this.assetBase + encodeURIComponent(this.animations.idle[0] || this.anim) + '.webm' })
         .catch(error => this.headText(error.message));
       return;
     }

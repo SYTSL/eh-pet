@@ -13,6 +13,15 @@
   this.stagedAction={kind,phase};this.anim=names[kind][phase];this.once=phase!=='loop';
   switchTo.call(this,this.anim,this.once);
  };
+ P.beginWaterAnimation=function(){
+  const action=this.stagedAction;
+  if(this.assetRoot!=='eh'||!this.optionalMedia?.includes('特殊喝水')||!action||
+      !['music','mine'].includes(action.kind)||!['intro','loop'].includes(action.phase))return false;
+  this.stagedAction={kind:action.kind,phase:'water-outro'};
+  this.stopMove();this.pendingSquash=false;
+  switchTo.call(this,names[action.kind].outro,true);
+  return true;
+ };
  P.stagedSync=function(){
   if(this.assetRoot!=='eh'||this.ac?.signal.aborted)return;
   const want=this.stagedDesired();
@@ -21,6 +30,10 @@
    this.stopMining();
   }
   const current=this.stagedAction;
+  if(current?.phase.startsWith('water-')){
+   if(current.kind==='music'&&want!=='music')this.stagedPlay('music','outro');
+   return;
+  }
   if(!current){if(want)this.stagedPlay(want,'intro');return}
   if(want==='music'&&current.kind==='drag'){this.stagedPlay('music','intro');return}
   if(want==='drag'&&(current.kind!=='drag'||current.phase==='outro')){this.stagedPlay('drag','intro');return}
@@ -36,6 +49,19 @@
  };
  P.handleEnded=function(completedAnim){
   const action=this.stagedAction;if(!action)return ended.call(this);
+  if(action.phase==='water-outro'){
+   if(completedAnim && completedAnim!==names[action.kind].outro)return;
+   this.stagedAction={kind:action.kind,phase:'water-drink'};
+   if(!this.waterPending)this.headText('先喝口水，歇一小会儿吧～','water-preview',5000);
+   switchTo.call(this,'特殊喝水',true);
+   return;
+  }
+  if(action.phase==='water-drink'){
+   if(completedAnim && completedAnim!=='特殊喝水')return;
+   if(action.kind==='mine'||this.stagedDesired()==='music')this.stagedPlay(action.kind,'intro');
+   else {this.stagedAction=null;playIdle.call(this)}
+   return;
+  }
   if(completedAnim && completedAnim!==names[action.kind][action.phase])return;
   if(action.phase==='intro'){
    this.stagedPlay(action.kind,action.kind==='mine'||this.stagedDesired()===action.kind?'loop':'outro');

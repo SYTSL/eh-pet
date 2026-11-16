@@ -24,14 +24,16 @@ function installDesktopGame() {
     const root = path.resolve(__dirname, '../..');
     const home = process.env.DSH_HOME;
     const candidates = species === 'main' ? [path.join(home, 'dsh-pet/main-animation/webm', name),path.join(root,'assets/webm',name)] : [path.join(home,'dsh-pet/pet',species+'-animation',name)];
-    const file = candidates.find(file => fs.existsSync(file));
+    const special = species === 'eh' && path.join(home, 'dsh-pet/pet/eh-animation/待机（桌面弹弓）.webm');
+    const hasSpecial = Boolean(special && fs.existsSync(special));
+    const file = hasSpecial ? special : candidates.find(file => fs.existsSync(file));
     if (!file) throw new Error('找不到当前桌宠动画');
     game = new BrowserWindow({ ...area, frame:false,transparent:true,alwaysOnTop:true,skipTaskbar:true,resizable:false,hasShadow:false,webPreferences:{preload:path.join(__dirname,'game-preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:true} });
     game.setAlwaysOnTop(true,'screen-saver');
     game.webContents.setWindowOpenHandler(()=>({action:'deny'}));
     game.webContents.on('will-navigate',e=>e.preventDefault());
     regions=[];dragging=false;lastPosition=null;creditedHits=0;
-    game.loadFile(path.join(__dirname,'desktop-game.html'),{query:{video:pathToFileURL(file).href}});
+    game.loadFile(path.join(__dirname,'desktop-game.html'),{query:{video:pathToFileURL(file).href, loopSeconds:hasSpecial ? '5' : ''}});
     owner.hide();
     timer=setInterval(()=>{
       if(!game||game.isDestroyed())return;

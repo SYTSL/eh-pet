@@ -4,12 +4,36 @@ const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
-const { randomInt } = require('node:crypto');
+const { randomInt, randomUUID } = require('node:crypto');
 const { rewardEmeralds, claimMiningBoost, restoreMiningBoost, shopRequest } = require('./economy.js');
+
+function installBundledMedia(data) {
+  const directory = path.join(data, 'pet', 'eh-animation');
+  try {
+    const videos = require('./eh-action-videos.js');
+    fs.mkdirSync(directory, { recursive: true });
+    for (const [name, base64] of Object.entries(videos)) {
+      const file = path.join(directory, name + '.webm');
+      if (fs.existsSync(file)) continue;
+      const temporary = file + '.' + randomUUID() + '.tmp';
+      try {
+        fs.writeFileSync(temporary, Buffer.from(base64, 'base64'), { flag: 'wx' });
+        if (!fs.existsSync(file)) fs.renameSync(temporary, file);
+      } catch (error) {
+        console.warn('[eh] 动作素材安装失败：' + name, error.message);
+      } finally {
+        fs.rmSync(temporary, { force: true });
+      }
+    }
+  } catch (error) {
+    console.warn('[eh] 附带动作素材不可用', error.message);
+  }
+}
 
 function installCompanion() {
   const data = path.join(process.env.DSH_HOME || path.join(os.homedir(), '.dsh'), 'dsh-pet');
   fs.mkdirSync(data, { recursive: true });
+  installBundledMedia(data);
   const settingsFile = path.join(data, 'companion-settings.json');
   const promptFile = path.join(data, '抽签提示词.txt');
   const musicDir = path.join(path.dirname(process.env.DSH_HOME || data), '音乐');

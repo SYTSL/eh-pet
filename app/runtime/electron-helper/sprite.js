@@ -1656,7 +1656,7 @@ class PetSprite {
         { label: '对话', action: 'chat' },
       ] },
       { label: '设置', action: 'deepseek-token' },
-      { label: '检查更新（v0.4.5）', action: 'check-update' },
+      { label: '检查更新（v0.4.6）', action: 'check-update' },
       { label: '商店/背包', action: 'shop' },
     );
     if (characters.length) {

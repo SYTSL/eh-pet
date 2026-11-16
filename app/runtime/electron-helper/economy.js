@@ -1,12 +1,13 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
+const foodIcons = require('./food-icons.js');
 
 const products = [
   { id: 'woodPickaxe', name: '木镐', icon: 'pickaxes.png', price: 150 },
   { id: 'cocoa', name: '可可果', icon: 'cocoa.png', price: 200 },
-  { id: 'chicken', name: '炸鸡腿', symbol: '🍗', animation: '吃炸鸡腿', price: 500 },
-  { id: 'cake', name: '蛋糕', symbol: '🍰', animation: '吃蛋糕', price: 900 },
+  { id: 'chicken', name: '炸鸡腿', icon: foodIcons.chicken, animation: '吃炸鸡腿', price: 500 },
+  { id: 'cake', name: '蛋糕', icon: foodIcons.cake, animation: '吃蛋糕', price: 900 },
 ];
 
 function walletFile() {

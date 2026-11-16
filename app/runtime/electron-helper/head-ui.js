@@ -117,7 +117,6 @@
     .eh-wallet-tabs{display:flex;gap:8px;margin:8px 0 12px}
     .eh-wallet-tabs button{flex:1;margin:0}
     .eh-wallet-tabs button[aria-pressed=true]{background:#426e54;color:#fff}
-    .eh-shop-symbol{font-size:29px;line-height:36px}
     .eh-bag-action{display:grid;gap:4px;margin-top:4px}
     .eh-bag-action span{font-size:11px;overflow-wrap:anywhere}
     .eh-shop-slot button:disabled{opacity:.62;cursor:default}
@@ -595,18 +594,17 @@
       tabs.append(tab);
     }
     panel.append(tabs, list, feedback);
-    const slot = (name, icon, detail, amount, symbol, onItem) => {
+    const slot = (name, icon, detail, amount, onItem) => {
       const tile = document.createElement('div');
       tile.className = 'eh-shop-slot';
       const preview = document.createElement('div');
       preview.className = 'eh-shop-art';
       preview.tabIndex = 0;
       preview.setAttribute('aria-label', name);
-      const art = document.createElement(symbol || icon === 'pickaxes.png' ? 'span' : 'img');
+      const art = document.createElement(icon === 'pickaxes.png' ? 'span' : 'img');
       art.className = 'eh-shop-icon';
-      if (symbol) { art.textContent = symbol; art.classList.add('eh-shop-symbol'); }
-      else if (icon === 'pickaxes.png') art.classList.add('eh-shop-pickaxe');
-      else { art.src = './shop-assets/' + icon; art.alt = ''; }
+      if (icon === 'pickaxes.png') art.classList.add('eh-shop-pickaxe');
+      else { art.src = icon.startsWith('data:image/png;base64,') ? icon : './shop-assets/' + icon; art.alt = ''; }
       const label = document.createElement('span');
       label.className = 'eh-shop-name';
       label.textContent = name;
@@ -662,7 +660,7 @@
       balanceValue.setAttribute('aria-label', '绿宝石余额 ' + wallet.emeralds);
       for (const product of products) {
         if (!shop) {
-          slot(product.name, product.icon, quantity(wallet[product.id]), null, product.symbol, event => itemMenu(event, product, wallet));
+          slot(product.name, product.icon, quantity(wallet[product.id]), null, event => itemMenu(event, product, wallet));
           continue;
         }
         const buy = document.createElement('button');
@@ -708,7 +706,7 @@
             if (amount) amount.disabled = false;
           } finally { purchasing = false; }
         };
-        slot(product.name, product.icon, buy, amount, product.symbol);
+        slot(product.name, product.icon, buy, amount);
       }
       this.layoutHead();
     };

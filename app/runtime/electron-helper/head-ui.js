@@ -124,6 +124,8 @@
   document.head.appendChild(settingsStyle);
   const P = PetSprite.prototype;
   const messageScale = 0.4;
+  const isWaterBubble = mode => mode === 'water' || mode === 'water-preview';
+  const waterReminderText = '我放下手中的事专门来提醒你该喝水了哦:(💧💧';
   const isSpeech = mode => mode === 'message' || mode === 'mining-emoji';
   P.headRequest = async function (action, input) {
     const result = await window.petBridge.companionRequest(action, input);
@@ -192,7 +194,7 @@
     close.onclick = () => (this.waterPending ? this.ackWater() : this.closeHead());
     const heading = document.createElement('h4');
     heading.textContent = title;
-    if (!isSpeech(mode)) this.headPanel.append(close);
+    if (!isSpeech(mode) && !isWaterBubble(mode)) this.headPanel.append(close);
     if (title) this.headPanel.append(heading);
     this.layoutHead();
     this.setInteractive(true);
@@ -200,10 +202,10 @@
   };
   P.headText = function (text, mode = 'message', timeout = 10000) {
     if (this.waterPending && mode !== 'water') return;
-    const box = this.makeHead(mode === 'water' ? '💧 喝水时间到啦' : '', mode);
+    const box = this.makeHead('', mode);
     const p = document.createElement('p');
     p.textContent = text;
-    if (isSpeech(mode)) {
+    if (isSpeech(mode) || isWaterBubble(mode)) {
       p.tabIndex = 0;
       p.setAttribute('role', 'button');
       p.onkeydown = (event) => {
@@ -223,6 +225,9 @@
       this.headHide = setTimeout(() => {
         if (this.headMode === mode) this.closeHead();
       }, timeout);
+  };
+  P.showWaterMessage = function (preview = false) {
+    this.headText(waterReminderText, preview ? 'water-preview' : 'water', preview ? 5000 : 0);
   };
   P.ackWater = function () {
     this.waterPending = false;
@@ -274,7 +279,7 @@
       if (!this.waterPending && Date.now() - this.prefs.lastWaterAt >= 3600000) {
         this.waterPending = true;
         this.waterSince = Date.now();
-        this.headText('该喝水啦～喝一口水，再点点我！\n点击人物或气泡，恢复原来大小。', 'water', 0);
+        this.showWaterMessage();
       }
       if (this.waterPending) {
         // Growth continues to a screen-friendly upper bound; the reminder remains until acknowledged.
@@ -321,7 +326,7 @@
   };
   P.openHeadFeature = async function (page) {
     if (this.waterPending) {
-      this.headText('先喝一口水，再点我解除提醒吧～', 'water', 0);
+      this.showWaterMessage();
       return;
     }
     if (page === 'shop' || page === 'bag') {
@@ -557,7 +562,7 @@
       const waterButton = button('测试喝水提醒', () => {
         this.waterPending = true;
         this.waterSince = Date.now();
-        this.headText('该喝水啦～点击我就解除提醒！', 'water', 0);
+        this.showWaterMessage();
         this.resizeHeadPet(this.prefs.size || this.baseHeadSize);
       });
       actions.append(saveButton, clearButton, waterButton);

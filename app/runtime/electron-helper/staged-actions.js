@@ -52,7 +52,7 @@
   if(action.phase==='water-outro'){
    if(completedAnim && completedAnim!==names[action.kind].outro)return;
    this.stagedAction={kind:action.kind,phase:'water-drink'};
-   if(!this.waterPending)this.headText('先喝口水，歇一小会儿吧～','water-preview',5000);
+   if(!this.waterPending)this.showWaterMessage(true);
    switchTo.call(this,'特殊喝水',true);
    return;
   }

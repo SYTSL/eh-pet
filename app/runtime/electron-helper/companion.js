@@ -49,6 +49,7 @@ function installCompanion() {
   const hasMedia = name => fs.existsSync(path.join(data, 'pet', 'eh-animation', name + '.webm'));
   const weatherFetch = (url, signal) => (net?.fetch ? net.fetch(url, {signal}) : fetch(url, {signal}));
   const mining = new WeakMap();
+  let snack;
   const startupAvailable = process.platform === 'win32' && typeof app?.setLoginItemSettings === 'function';
   const startupName = 'eh桌宠';
   const startupOptions = { path: process.execPath, args: [] };
@@ -112,7 +113,36 @@ function installCompanion() {
           ...product, usable: !product.animation || hasMedia(product.animation),
         })) };
       }
+      if (action === 'snack-start') {
+        if (snack) return { ok:true, played:false };
+        const { wallet } = shopRequest('shop-status');
+        const candidates = [
+          { item:'cocoa', use:'feed', animation:'吃可可果', caught:'偷吃' },
+          { item:'chicken', use:'chicken', animation:'吃炸鸡腿', caught:'打断鸡腿' },
+        ].filter(food => wallet[food.item] > 0 && hasMedia(food.animation) && hasMedia(food.caught));
+        if (!candidates.length) return { ok:true, played:false };
+        const food = candidates[randomInt(candidates.length)];
+        const id = randomUUID();
+        const release = () => {
+          if (snack?.id !== id) return;
+          clearTimeout(snack.timeout);
+          event.sender.removeListener?.('destroyed', release);
+          snack = undefined;
+        };
+        snack = { id, food, sender:event.sender, release, timeout:setTimeout(release, 30000) };
+        snack.timeout.unref?.();
+        event.sender.once?.('destroyed', release);
+        return { ok:true, played:true, id, animation:food.animation, caught:food.caught };
+      }
+      if (action === 'snack-cancel' || action === 'snack-eat') {
+        if (!snack || snack.id !== input || snack.sender !== event.sender) return { ok:true };
+        const { food, release } = snack;
+        release();
+        return action === 'snack-eat' ? shopRequest('pet-item-action', food.use) : { ok:true };
+      }
       if (action === 'pet-item-action') {
+        if (snack && snack.food.use === input && shopRequest('shop-status').wallet[snack.food.item] <= 1)
+          throw new Error('这份食物正在被偷吃');
         const name = { chicken:'吃炸鸡腿', cake:'吃蛋糕' }[input];
         if (name && !hasMedia(name)) throw new Error('这个进食动作还没有素材，食物已保留');
         return shopRequest(action, input);

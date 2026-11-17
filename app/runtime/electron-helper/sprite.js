@@ -492,6 +492,7 @@ class PetSprite {
   // 双缓冲切换：前台视频切换 + 降级视频清 handler 并停播，防残留 ended 雪崩
   switchTo(next, nextOnce, playbackId, url) {
     if (!next) return;
+    if (this.snack) this.finishSnack((this.snack.video?.currentTime ?? 0) >= 4);
     const pending = this.pending;
     if (pending && pending.anim === next && pending.once === nextOnce) {
       // 防重命中（单动画点击时目标=当前动画，不重播）：仍消费 Q 弹标记，压当前前台视频，
@@ -525,6 +526,7 @@ class PetSprite {
     const loadGuard = (why) => {
       if (!this.pending || this.pending.gen !== gen) return;
       this.pending = null;
+      if (this.snack?.animation === next) this.finishSnack(false);
       console.warn('[dsh-pet] 素材加载失败 pet=' + this.pet.id + ' anim=' + next + '：' + why + '（已释放本次切换）');
       // 播放回执：这一段没能播起来 → 如实回 failed（而不是让调用方干等到 timeout）
       if (playbackId) {
@@ -556,6 +558,10 @@ class PetSprite {
         }
       }
       this.front = this.front === 0 ? 1 : 0;
+      if (this.snack?.animation === next) {
+        this.snack.video = el;
+        el.addEventListener('timeupdate', this.snack.onTime);
+      }
       this.pending = null;
       this.playback = playbackId || null;
       el.style.transform = this.facing === 'right' ? 'scaleX(-1)' : '';
@@ -582,7 +588,6 @@ class PetSprite {
   }
 
   playOnce(name, playbackId, url) {
-    this.stealingCocoa = false;
     this.anim = name;
     this.once = true;
     this.switchTo(name, true, playbackId, url);
@@ -665,7 +670,7 @@ class PetSprite {
     // 占用锁：锁生效时不掷骰。这里是随机链的唯一入口（动画播完才会走到），一句判断就把随机动画、
     // 随机转向与自主走位一起停住——宠物停在最后一帧，等持锁者的下一条指令（走 /anim，不经这里）。
     if (this.frozen) return;
-    if (!skipSnack && this.assetRoot === 'eh' && this.playItemAction && this.anim !== '偷吃' && this.anim !== '吃可可果' && Math.random() < .05) {
+    if (!skipSnack && this.assetRoot === 'eh' && this.playItemAction && !['偷吃', '吃可可果', '吃炸鸡腿', '打断鸡腿'].includes(this.anim) && Math.random() < .05) {
       const previous = this.anim;
       void this.playItemAction('steal').then((played) => {
         if (!played && this.anim === previous && !this.dragState.active && !this.ac.signal.aborted) this.playIdle(true);
@@ -1553,11 +1558,15 @@ class PetSprite {
   onClick(e) {
     const d = this.dragState;
     if (d.active || d.dragging || this.justDragged) return;
-    if (this.stealingCocoa && this.anim === '吃可可果' && !this.stagedAction && !isOpenShortcut(e)) {
-      this.stopThrow();
-      this.stopMove();
-      this.playOnce('偷吃');
-      return;
+    if (this.snack && !isOpenShortcut(e)) {
+      if ((this.snack.video?.currentTime ?? 0) < 4) {
+        const caught = this.snack.caught;
+        this.finishSnack(false);
+        this.stopThrow();
+        this.stopMove();
+        this.playOnce(caught);
+      }
+      return true;
     }
     // Ctrl（macOS 为 Cmd）+ 左键 = 呼出 DSH：与菜单「打开网站」同一动作，只是快捷键——
     // 不播点击动画、也不参与积分，避免「摸一下宠物」变成「开窗口」。
@@ -1568,6 +1577,7 @@ class PetSprite {
       return;
     }
     // 积分判定已在 onPointerDown（按下即触发）完成：已触发过就只收手停住，不再播普通点击动画
+    if (this.uncatchableSnack === this.gen && !isOpenShortcut(e)) return true;
     if (this.pressScoreFired) {
       this.pressScoreFired = false;
       this.stopThrow();
@@ -1657,7 +1667,7 @@ class PetSprite {
         { label: '对话', action: 'chat' },
       ] },
       { label: '设置', action: 'deepseek-token' },
-      { label: '检查更新（v0.4.8）', action: 'check-update' },
+      { label: '检查更新（v0.4.9）', action: 'check-update' },
       { label: '商店/背包', action: 'shop' },
     );
     if (characters.length) {

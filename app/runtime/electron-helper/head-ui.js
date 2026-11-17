@@ -241,7 +241,7 @@
       }, timeout);
   };
   P.showWaterMessage = function (preview = false) {
-    this.headText(waterReminderText, preview ? 'water-preview' : 'water', preview ? 5000 : 0);
+    this.headText(preview ? waterReminderText : '水水水💧💧💧💧💧💧', preview ? 'water-preview' : 'water', preview ? 5000 : 0);
   };
   P.ackWater = function () {
     this.waterPending = false;
@@ -320,7 +320,7 @@
       this.ackWater();
       return;
     }
-    click.call(this, event);
+    if (click.call(this, event)) return;
     if (this.stagedAction?.kind === 'mine' || this.anim === '偷吃') return;
     if (!event.ctrlKey && !event.metaKey && this.prefs?.chatter && (!this.headMode || this.headMode === 'message'))
       this.headText(nextPhrase());
@@ -870,6 +870,15 @@
     catch (error) { feedback.textContent = error.message; this.layoutHead(); }
   };
 
+  P.finishSnack = function (eat) {
+    const snack = this.snack;
+    if (!snack) return;
+    this.snack = null;
+    snack.video?.removeEventListener('timeupdate', snack.onTime);
+    if (eat) this.uncatchableSnack = this.gen;
+    void this.headRequest(eat ? 'snack-eat' : 'snack-cancel', snack.id).catch(error => console.warn('[eh] 偷吃结算失败', error));
+  };
+
   P.playItemAction = async function (action) {
     if (action === 'mine') return this.toggleMining();
     if (this.itemActionPending || this.assetRoot !== 'eh' || this.stagedAction || this.dragState.active ||
@@ -878,13 +887,25 @@
     this.itemActionPending = true;
     const previous = this.anim;
     try {
-      const result = await this.headRequest('pet-item-action', action);
+      const result = await this.headRequest(action === 'steal' ? 'snack-start' : 'pet-item-action', action);
       if (!result.played || this.anim !== previous || this.assetRoot !== 'eh' ||
-          this.stagedAction || this.dragState.active || this.ac.signal.aborted) return false;
+          this.stagedAction || this.dragState.active || this.ac.signal.aborted) {
+        if (result.id) await this.headRequest('snack-cancel', result.id);
+        return false;
+      }
       this.stopMove();
       this.stopThrow();
-      this.playOnce(animation);
-      this.stealingCocoa = action === 'steal';
+      this.playOnce(result.animation || animation);
+      if (result.id) {
+        this.snack = result;
+        result.onTime = () => {
+          if (this.snack === result && result.video.currentTime >= 4) this.finishSnack(true);
+        };
+        if (!this.pending) {
+          result.video = this.front === 0 ? this.videoA : this.videoB;
+          result.video.addEventListener('timeupdate', result.onTime);
+        }
+      }
       if (action === 'feed' && result.boost && !this.headMode) this.headText(`下次挖矿收益 ×${result.boost}%`);
       return true;
     } catch (error) {

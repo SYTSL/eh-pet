@@ -103,6 +103,18 @@
     .eh-head .eh-actions button:first-child{background:#52765a;color:#fff}
     .eh-head .eh-feedback{font-size:12px;color:#71816b;margin:10px 0 0}
     .eh-head .eh-size-value{float:right;font-size:12px;font-weight:400;color:#7b8879}
+    .eh-stock-chart{display:grid;grid-template-columns:minmax(0,1fr) 33px;gap:4px;background:#16232a;color:#dfeaec;border-radius:8px;padding:8px;font:11px/1.25 'Segoe UI',sans-serif;font-variant-numeric:tabular-nums}
+    .eh-stock-chart output{grid-column:1/-1;color:#f1f5f6;min-height:24px}
+    .eh-stock-plot{position:relative;display:flex;height:110px}
+    .eh-stock-gridline{position:absolute;left:0;right:0;border-top:1px solid #39484e;pointer-events:none}
+    .eh-stock-axis{position:relative}
+    .eh-stock-axis span{position:absolute;left:1px;transform:translateY(-50%)}
+    .eh-stock-time{display:flex;justify-content:space-between}
+    .eh-head .eh-stock-candle{position:relative;flex:1;min-width:0;padding:0;margin:0;border-radius:0;background:transparent;color:var(--candle)}
+    .eh-head .eh-stock-candle:is(:hover,:focus-visible){background:#ffffff16;outline:1px solid #a8b6ba;z-index:1}
+    .eh-stock-candle span{position:absolute;left:50%;width:1px;background:currentColor;transform:translateX(-50%);pointer-events:none}
+    .eh-stock-candle span+span{width:65%;min-height:1px}
+    .eh-head .eh-stock-receipt{padding:7px 9px;background:#edf3e7;border-radius:8px;font-size:13px}
     .eh-shop-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
     .eh-wallet-balance{display:inline-flex;align-items:center;gap:4px;margin-left:10px;color:#4e7056;font-size:12px;font-weight:500;line-height:1;vertical-align:middle;font-variant-numeric:tabular-nums}
     .eh-shop-slot{position:relative;min-width:0;padding:5px;border:1px solid #d9e4d2;border-radius:10px;background:#f3f6eb;text-align:center}
@@ -172,12 +184,14 @@
     this.syncInputBusy();
   };
   P.closeHead = function () {
+    clearTimeout(this.stockRefreshTimer);
     clearTimeout(this.headHide);
     if (this.headPanel) this.headPanel.hidden = true;
     this.headMode = null;
     this.syncInputBusy();
   };
   P.makeHead = function (title, mode) {
+    clearTimeout(this.stockRefreshTimer);
     this.stopMove();
     this.stopThrow();
     clearTimeout(this.headHide);
@@ -293,6 +307,7 @@
     this.headWaterTimer = setInterval(tickWater, 1000);
   };
   P.disposeHeadUI = function () {
+    clearTimeout(this.stockRefreshTimer);
     clearTimeout(this.headHide);
     clearInterval(this.headWaterTimer);
     this.musicAudio?.pause();
@@ -327,6 +342,10 @@
   P.openHeadFeature = async function (page) {
     if (this.waterPending) {
       this.showWaterMessage();
+      return;
+    }
+    if (page === 'stocks') {
+      this.openStocks();
       return;
     }
     if (page === 'shop' || page === 'bag') {
@@ -570,6 +589,138 @@
     box.append(feedback);
     this.layoutHead();
   };
+  P.openStocks = function () {
+    const panel = this.makeHead('绿宝石模拟盘', 'stocks');
+    panel.onclick = null;
+    const create = (tag, text) => {
+      const control = document.createElement(tag);
+      if (text) control.textContent = text;
+      return control;
+    };
+    const balance = create('p');
+    const picker = create('select');
+    picker.setAttribute('aria-label', '虚拟股票');
+    const chart = create('div');
+    chart.className = 'eh-stock-chart';
+    const quote = create('p');
+    const quantity = create('input');
+    Object.assign(quantity, { type: 'number', min: '1', max: '9999', step: '1', value: '1' });
+    quantity.setAttribute('aria-label', '股数');
+    const buy = create('button', '买入');
+    const sell = create('button', '卖出');
+    const feedback = create('p');
+    feedback.setAttribute('aria-live', 'polite');
+    const receipt = create('p');
+    receipt.className = 'eh-stock-receipt';
+    receipt.setAttribute('aria-live', 'polite');
+    receipt.hidden = true;
+    panel.append(balance, picker, chart, quote, quantity, buy, sell, receipt, feedback);
+    let data;
+    let busy = false;
+    const active = () => this.headMode === 'stocks' && picker.isConnected && !this.ac.signal.aborted;
+    const selection = () => data?.stocks.find(stock => stock.id === picker.value);
+    const render = () => {
+      const stock = selection();
+      if (!stock || !active()) return;
+      balance.textContent = `💎 可用 ${data.emeralds}  ·  每 15 秒自动更新`;
+      const profit = stock.shares * stock.price - stock.cost;
+      quote.textContent = `现价 ${stock.price}  ·  持有 ${stock.shares} 股  ·  浮动盈亏 ${profit > 0 ? '+' : ''}${profit}`;
+      const readout = create('output');
+      const plot = create('div');
+      plot.className = 'eh-stock-plot';
+      const axis = create('div');
+      axis.className = 'eh-stock-axis';
+      const timeAxis = create('div');
+      timeAxis.className = 'eh-stock-time';
+      const low = Math.min(...stock.history.map(candle => candle.low)) - 1;
+      const high = Math.max(...stock.history.map(candle => candle.high)) + 1;
+      const y = value => (high - value) * 100 / (high - low);
+      const formatTime = time => new Date(time).toLocaleTimeString('zh-CN', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      });
+      const describe = candle => `${formatTime(candle.time)}  开 ${candle.open}  高 ${candle.high}  低 ${candle.low}  收 ${candle.close}`;
+      for (const price of new Set([high, Math.round((low + high) / 2), low])) {
+        const line = create('span');
+        line.className = 'eh-stock-gridline';
+        const label = create('span', String(price));
+        line.style.top = label.style.top = y(price) + '%';
+        plot.append(line);
+        axis.append(label);
+      }
+      const last = stock.history.at(-1);
+      readout.textContent = describe(last);
+      for (const candle of stock.history) {
+        const button = create('button');
+        button.type = 'button';
+        button.className = 'eh-stock-candle';
+        button.setAttribute('aria-label', describe(candle));
+        button.style.setProperty('--candle', candle.close > candle.open ? '#ff7373'
+          : candle.close < candle.open ? '#47d39c' : '#c0cace');
+        for (const [top, bottom] of [[candle.high, candle.low],
+          [Math.max(candle.open, candle.close), Math.min(candle.open, candle.close)]]) {
+          const mark = create('span');
+          mark.style.top = y(top) + '%';
+          mark.style.height = Math.max(1, y(bottom) - y(top)) + '%';
+          button.append(mark);
+        }
+        const inspect = () => { readout.textContent = describe(candle); };
+        button.onpointerenter = button.onfocus = button.onclick = inspect;
+        plot.append(button);
+      }
+      timeAxis.append(create('span', formatTime(stock.history[0].time)), create('span', formatTime(last.time)));
+      chart.replaceChildren(readout, plot, axis, timeAxis);
+      buy.disabled = busy;
+      sell.disabled = busy || stock.shares === 0;
+      this.layoutHead();
+    };
+    const request = async side => {
+      if (busy || !active()) return;
+      const stock = selection();
+      if (side && !stock) return;
+      clearTimeout(this.stockRefreshTimer);
+      busy = true;
+      buy.disabled = sell.disabled = true;
+      let errorMessage = '';
+      try {
+        data = side
+          ? await this.headRequest('stock-trade', { id: stock.id, side, quantity: quantity.valueAsNumber, price: stock.price })
+          : await this.headRequest('stock-status');
+        if (!active()) return;
+        if (!picker.options.length) for (const entry of data.stocks) {
+          const option = create('option', entry.name);
+          option.value = entry.id;
+          picker.append(option);
+        }
+        if (side) feedback.textContent = side === 'buy' ? '买入成功' : '';
+        if (data.receipt) {
+          const { name, quantity, price, revenue, cost, profit } = data.receipt;
+          const signed = (profit > 0 ? '+' : '') + profit;
+          receipt.hidden = false;
+          receipt.textContent = `本次卖出 ${name} ${quantity} 股 × ${price}\n成交收入 ${revenue} 💎 · 买入成本 ${cost} 💎\n实际盈亏 ${signed} 💎`;
+        }
+      } catch (error) {
+        errorMessage = error.message;
+        if (side) {
+          try { data = await this.headRequest('stock-status'); } catch {}
+        }
+      } finally {
+        busy = false;
+        if (active()) {
+          if (errorMessage) feedback.textContent = errorMessage;
+          render();
+          const quoteInterval = 15000;
+          // Fetch just after the next quote boundary.
+          const delay = quoteInterval - Date.now() % quoteInterval + 100;
+          this.stockRefreshTimer = setTimeout(() => void request(), delay);
+        }
+      }
+    };
+    picker.onchange = render;
+    buy.onclick = () => void request('buy');
+    sell.onclick = () => void request('sell');
+    void request();
+  };
+
   P.openWallet = async function (page) {
     const shop = page === 'shop';
     const panel = this.makeHead('商店/背包', page);

@@ -1652,11 +1652,12 @@ class PetSprite {
         { label: '桌面弹弓', action: 'desktop-game' },
         { label: '听歌（本地音乐）', action: 'local-music' },
         { label: '抽签', action: 'fortune' },
+        { label: '模拟炒股', action: 'stocks' },
         { label: '天气查询', action: 'weather' },
         { label: '对话', action: 'chat' },
       ] },
       { label: '设置', action: 'deepseek-token' },
-      { label: '检查更新（v0.4.7）', action: 'check-update' },
+      { label: '检查更新（v0.4.8）', action: 'check-update' },
       { label: '商店/背包', action: 'shop' },
     );
     if (characters.length) {
@@ -1740,7 +1741,7 @@ class PetSprite {
       void this.playItemAction(leaf.action);
       return;
     }
-    if (['shop', 'bag'].includes(leaf.action)) {
+    if (['shop', 'bag', 'stocks'].includes(leaf.action)) {
       void this.openHeadFeature(leaf.action);
       return;
     }

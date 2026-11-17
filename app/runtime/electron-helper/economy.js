@@ -17,12 +17,14 @@ function walletFile() {
 function readWallet() {
   const file = walletFile();
   const saved = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : {};
-  return Object.fromEntries(['emeralds', ...products.map(({id}) => id), 'miningBoost'].map((key) => {
+  const wallet = Object.fromEntries(['emeralds', ...products.map(({id}) => id), 'miningBoost'].map((key) => {
     const value = saved[key] === undefined ? 0 : saved[key];
     if (!Number.isSafeInteger(value) || value < 0 ||
         (key === 'miningBoost' && value !== 0 && (value < 115 || value > 150))) throw new Error('背包数据无效');
     return [key, value];
   }));
+  if (saved.portfolio !== undefined) wallet.portfolio = saved.portfolio;
+  return wallet;
 }
 
 function saveWallet(wallet) {
@@ -87,4 +89,61 @@ function shopRequest(action, item) {
   return { ok: true, wallet, products };
 }
 
-module.exports = { rewardEmeralds, claimMiningBoost, restoreMiningBoost, shopRequest };
+const stocks = [
+  { id: 'cocoa', name: '可可果园', base: 24 },
+  { id: 'mine', name: '绿晶矿业', base: 36 },
+  { id: 'cake', name: '云朵甜品', base: 18 },
+];
+
+function stockRequest(action, input) {
+  const wallet = readWallet();
+  const positions = wallet.portfolio ?? {};
+  const tick = Math.floor(Date.now() / 15000);
+  const market = stocks.map((stock, index) => {
+    const priceAt = time => {
+      const swing = Math.sin(time / (4 + index) + index) * 0.22;
+      const ripple = Math.sin(time * (1.19 + index / 10)) * 0.07;
+      return Math.round(stock.base * (1 + swing + ripple));
+    };
+    const history = Array.from({ length: 24 }, (_, offset) => {
+      const time = tick - 23 + offset;
+      const samples = [0, 0.25, 0.5, 0.75, 1].map(fraction => priceAt(time - 1 + fraction));
+      return { time: time * 15000, open: samples[0], high: Math.max(...samples),
+        low: Math.min(...samples), close: samples.at(-1) };
+    });
+    return { ...stock, price: history.at(-1).close, history };
+  });
+  let receipt;
+  if (action === 'stock-trade') {
+    const { id, side, quantity, price } = input || {};
+    const stock = market.find(entry => entry.id === id);
+    if (!stock || !['buy', 'sell'].includes(side) || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 9999)
+      throw new Error('请选择股票并输入 1–9999 股');
+    if (price !== stock.price) throw new Error('价格已变动，请刷新后重试');
+    const position = positions[id] ?? { shares: 0, cost: 0 };
+    const amount = quantity * stock.price;
+    if (side === 'buy') {
+      if (amount > wallet.emeralds) throw new Error('绿宝石不够');
+      wallet.emeralds -= amount;
+      positions[id] = { shares: position.shares + quantity, cost: position.cost + amount };
+    } else {
+      if (quantity > position.shares) throw new Error('持仓股数不够');
+      const balance = wallet.emeralds + amount;
+      if (!Number.isSafeInteger(balance)) throw new Error('余额超出上限');
+      const cost = quantity === position.shares ? position.cost
+        : Math.round(position.cost * (quantity / position.shares));
+      receipt = { name: stock.name, quantity, price: stock.price, revenue: amount, cost, profit: amount - cost };
+      wallet.emeralds = balance;
+      if (quantity === position.shares) delete positions[id];
+      else positions[id] = { shares: position.shares - quantity, cost: position.cost - cost };
+    }
+    wallet.portfolio = positions;
+    saveWallet(wallet);
+  }
+  return {
+    ok: true, emeralds: wallet.emeralds, receipt,
+    stocks: market.map(stock => ({ ...stock, shares: 0, cost: 0, ...positions[stock.id] })),
+  };
+}
+
+module.exports = { stockRequest, rewardEmeralds, claimMiningBoost, restoreMiningBoost, shopRequest };

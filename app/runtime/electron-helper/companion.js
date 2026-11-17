@@ -5,7 +5,7 @@ const path = require('node:path');
 const os = require('node:os');
 const { pathToFileURL } = require('node:url');
 const { randomInt, randomUUID } = require('node:crypto');
-const { rewardEmeralds, claimMiningBoost, restoreMiningBoost, shopRequest } = require('./economy.js');
+const { rewardEmeralds, claimMiningBoost, restoreMiningBoost, shopRequest, stockRequest } = require('./economy.js');
 
 function installBundledMedia(data) {
   const directory = path.join(data, 'pet', 'eh-animation');
@@ -103,6 +103,7 @@ function installCompanion() {
     const petPage = pathToFileURL(path.join(__dirname, 'index.html')).href;
     if ((!win || event.sender !== win.webContents) && senderFile !== petPage) throw new Error('Unauthorized window');
     try {
+      if (action === 'stock-status' || action === 'stock-trade') return stockRequest(action, input);
       if (action === 'check-update') return await require('./updates.js').checkUpdate();
       if (action === 'optional-media') return { ok:true, available:optionalNames.filter(hasMedia) };
       if (action === 'shop-status' || action === 'shop-buy') {

@@ -119,6 +119,7 @@ function installCompanion() {
         const candidates = [
           { item:'cocoa', use:'feed', animation:'吃可可果', caught:'偷吃' },
           { item:'chicken', use:'chicken', animation:'吃炸鸡腿', caught:'打断鸡腿' },
+          { item:'cake', use:'cake', animation:'吃蛋糕', caught:'打断蛋糕' },
         ].filter(food => wallet[food.item] > 0 && hasMedia(food.animation) && hasMedia(food.caught));
         if (!candidates.length) return { ok:true, played:false };
         const food = candidates[randomInt(candidates.length)];

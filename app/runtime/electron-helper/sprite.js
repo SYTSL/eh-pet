@@ -670,7 +670,7 @@ class PetSprite {
     // 占用锁：锁生效时不掷骰。这里是随机链的唯一入口（动画播完才会走到），一句判断就把随机动画、
     // 随机转向与自主走位一起停住——宠物停在最后一帧，等持锁者的下一条指令（走 /anim，不经这里）。
     if (this.frozen) return;
-    if (!skipSnack && this.assetRoot === 'eh' && this.playItemAction && !['偷吃', '吃可可果', '吃炸鸡腿', '打断鸡腿'].includes(this.anim) && Math.random() < .05) {
+    if (!skipSnack && this.assetRoot === 'eh' && this.playItemAction && !['偷吃', '吃可可果', '吃炸鸡腿', '打断鸡腿', '吃蛋糕', '打断蛋糕'].includes(this.anim) && Math.random() < .05) {
       const previous = this.anim;
       void this.playItemAction('steal').then((played) => {
         if (!played && this.anim === previous && !this.dragState.active && !this.ac.signal.aborted) this.playIdle(true);
@@ -1667,7 +1667,7 @@ class PetSprite {
         { label: '对话', action: 'chat' },
       ] },
       { label: '设置', action: 'deepseek-token' },
-      { label: '检查更新（v0.4.9）', action: 'check-update' },
+      { label: '检查更新（v0.4.10）', action: 'check-update' },
       { label: '商店/背包', action: 'shop' },
     );
     if (characters.length) {

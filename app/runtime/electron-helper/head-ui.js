@@ -241,10 +241,16 @@
       }, timeout);
   };
   P.showWaterMessage = function (preview = false) {
-    this.headText(preview ? waterReminderText : '水水水💧💧💧💧💧💧', preview ? 'water-preview' : 'water', preview ? 5000 : 0);
+    const working = ['mine', 'music'].includes(this.stagedAction?.kind) ||
+      (this.musicAudio && !this.musicAudio.paused && !this.musicAudio.ended && !this.musicAudio.error);
+    if (preview || (!this.waterPending && working)) this.waterWorkReminder = true;
+    const special = preview || this.waterWorkReminder || working;
+    this.headText(special ? waterReminderText : '水水水💧💧💧💧💧💧',
+      preview ? 'water-preview' : 'water', preview ? 5000 : 0);
   };
   P.ackWater = function () {
     this.waterPending = false;
+    this.waterWorkReminder = false;
     this.waterSince = 0;
     this.prefs.lastWaterAt = Date.now();
     this.headPanel.style.fontSize = '14px';
@@ -288,7 +294,10 @@
     const tickWater = () => {
       const due = this.prefs.lastWaterAt + 3600000;
       if (this.prefs.water && !this.waterPending && Date.now() >= due - 15000 && Date.now() < due &&
-          this.waterAnimationDue !== due && this.beginWaterAnimation?.()) this.waterAnimationDue = due;
+          this.waterAnimationDue !== due && this.beginWaterAnimation?.()) {
+        this.waterAnimationDue = due;
+        this.waterWorkReminder = true;
+      }
       if (!this.prefs.water && !this.waterPending) return;
       if (!this.waterPending && Date.now() - this.prefs.lastWaterAt >= 3600000) {
         this.waterPending = true;

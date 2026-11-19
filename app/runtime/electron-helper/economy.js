@@ -7,6 +7,7 @@ const products = [
   { id: 'woodPickaxe', name: '木镐', icon: 'pickaxes.png', price: 150 },
   { id: 'cocoa', name: '可可果', icon: 'cocoa.png', price: 200 },
   { id: 'chicken', name: '炸鸡腿', icon: foodIcons.chicken, animation: '吃炸鸡腿', price: 500 },
+  { id: 'catTicket', name: '猫咖券', icon: require('./cat-ticket-icon.js'), animation: '撸猫', price: 1000 },
   { id: 'cake', name: '蛋糕', icon: foodIcons.cake, animation: '吃蛋糕', price: 900 },
 ];
 
@@ -65,7 +66,7 @@ function shopRequest(action, item) {
     if (id === 'woodPickaxe' && (wallet.woodPickaxe || quantity !== 1)) throw new Error('木镐只能购买一把');
     if (quantity > Math.floor(wallet.emeralds / product.price)) throw new Error('绿宝石不够');
     wallet.emeralds -= product.price * quantity;
-    wallet[id] += quantity;
+    wallet[id] += quantity * (id === 'catTicket' ? 3 : 1);
     saveWallet(wallet);
   }
   if (action === 'pet-item-action') {
@@ -79,7 +80,7 @@ function shopRequest(action, item) {
       wallet.cocoa--;
       wallet.miningBoost = Math.max(wallet.miningBoost, require('node:crypto').randomInt(115, 151));
       saveWallet(wallet);
-    } else if (item === 'chicken' || item === 'cake') {
+    } else if (item === 'chicken' || item === 'cake' || item === 'catTicket') {
       if (!wallet[item]) throw new Error('背包里没有这件食物');
       wallet[item]--;
       saveWallet(wallet);

@@ -188,6 +188,7 @@
     clearTimeout(this.headHide);
     if (this.headPanel) this.headPanel.hidden = true;
     this.headMode = null;
+    this.stagedSync?.();
     this.syncInputBusy();
   };
   P.makeHead = function (title, mode) {
@@ -196,6 +197,7 @@
     this.stopThrow();
     clearTimeout(this.headHide);
     this.headMode = mode;
+    this.stagedSync?.();
     this.headPanel.dataset.mode = mode;
     this.headPanel.style.transform = mode === 'message' ? `translateX(-50%) scale(${messageScale})` : 'translateX(-50%)';
     this.headPanel.style.transformOrigin = 'bottom center';
@@ -241,12 +243,15 @@
       }, timeout);
   };
   P.showWaterMessage = function (preview = false) {
-    const working = ['mine', 'music'].includes(this.stagedAction?.kind) ||
-      (this.musicAudio && !this.musicAudio.paused && !this.musicAudio.ended && !this.musicAudio.error);
-    if (preview || (!this.waterPending && working)) this.waterWorkReminder = true;
-    const special = preview || this.waterWorkReminder || working;
-    this.headText(special ? waterReminderText : '水水水💧💧💧💧💧💧',
-      preview ? 'water-preview' : 'water', preview ? 5000 : 0);
+    if (preview) {
+      // The animation's reminder fulfils this hour's reminder.
+      this.prefs.lastWaterAt = Date.now();
+      this.waterAnimationDue = null;
+      void this.headRequest('preferences', { ackWater: true }).catch(() => {});
+      this.headText(waterReminderText, 'water-preview', 5000);
+      return;
+    }
+    this.headText('水水水💧💧💧💧💧💧', 'water', 0);
   };
   P.ackWater = function () {
     this.waterPending = false;
@@ -300,6 +305,10 @@
       }
       if (!this.prefs.water && !this.waterPending) return;
       if (!this.waterPending && Date.now() - this.prefs.lastWaterAt >= 3600000) {
+        if (this.beginWaterAnimation?.()) {
+          this.prefs.lastWaterAt = Date.now();
+          return;
+        }
         this.waterPending = true;
         this.waterSince = Date.now();
         this.showWaterMessage();
@@ -449,7 +458,7 @@
         }
         return play(index + offset);
       };
-      button('添加歌曲', async () => {
+      const addMusic = button('添加歌曲', async () => {
         try {
           const result = await this.headRequest('music');
           if (!result.canceled) {
@@ -465,8 +474,8 @@
       fill();
       box.append(select);
       select.onchange = () => play(Number(select.value));
-      button('上一首', () => step(-1));
-      button('播放 / 暂停', async () => {
+      const previousMusic = button('上一首', () => step(-1));
+      const toggleMusic = button('播放 / 暂停', async () => {
         if (!this.musicAudio.src) return play(index);
         if (this.musicAudio.paused) {
           try {
@@ -476,8 +485,13 @@
           }
         } else this.musicAudio.pause();
       });
-      button('下一首', () => step(1));
-      button('停止', () => { this.musicAudio.pause(); this.musicAudio.currentTime = 0; });
+      const nextMusic = button('下一首', () => step(1));
+      for (const buttons of [[addMusic, toggleMusic], [previousMusic, nextMusic]]) {
+        const row = document.createElement('div');
+        row.className = 'eh-actions';
+        row.append(...buttons);
+        box.insertBefore(row, select);
+      }
       const repeat = field('单曲循环', '', 'checkbox');
       repeat.checked = this.musicAudio.loop;
       repeat.onchange = () => { this.musicAudio.loop = repeat.checked; };
@@ -884,7 +898,12 @@
     if (!snack) return;
     this.snack = null;
     snack.video?.removeEventListener('timeupdate', snack.onTime);
-    if (eat) this.uncatchableSnack = this.gen;
+    if (eat) {
+      this.foodFeedbackGen = this.gen;
+      this.uncatchableSnack = this.gen;
+      this.foodFeedback = '好吃😊';
+      this.snackUnclicked = !snack.clicked;
+    }
     void this.headRequest(eat ? 'snack-eat' : 'snack-cancel', snack.id).catch(error => console.warn('[eh] 偷吃结算失败', error));
   };
 
@@ -892,7 +911,7 @@
     if (action === 'mine') return this.toggleMining();
     if (this.itemActionPending || this.assetRoot !== 'eh' || this.stagedAction || this.dragState.active ||
         this.waterPending || this.frozen || this.ac.signal.aborted) return false;
-    const animation = { chicken:'吃炸鸡腿', cake:'吃蛋糕' }[action] || '吃可可果';
+    const animation = { catTicket:'撸猫', chicken:'吃炸鸡腿', cake:'吃蛋糕' }[action] || '吃可可果';
     this.itemActionPending = true;
     const previous = this.anim;
     try {
@@ -905,6 +924,7 @@
       this.stopMove();
       this.stopThrow();
       this.playOnce(result.animation || animation);
+      this.foodFeedback = result.id ? null : undefined;
       if (result.id) {
         this.snack = result;
         result.onTime = () => {

@@ -1106,7 +1106,7 @@ function buildMenuTree(animations, eh = false) {
 	const events = animations.events ?? {};
 	for (const key of Object.keys(events)) {
 		if (key === "balance" || key === "workStatus") continue;
-		const pool = events[key] ?? [];
+		const pool = eh && key === "whisper" ? ["看手机"] : events[key] ?? [];
 		const names = [];
 		for (const slot of pool) if (typeof slot === "string") names.push(slot);
 		else names.push(...slot);

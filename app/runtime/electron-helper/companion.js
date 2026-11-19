@@ -14,11 +14,14 @@ function installBundledMedia(data) {
     fs.mkdirSync(directory, { recursive: true });
     for (const [name, base64] of Object.entries(videos)) {
       const file = path.join(directory, name + '.webm');
-      if (fs.existsSync(file)) continue;
+      const bytes = Buffer.from(base64, 'base64');
+      if (fs.existsSync(file)) {
+        if (name !== '吃炸鸡腿' || fs.readFileSync(file).equals(bytes)) continue;
+      }
       const temporary = file + '.' + randomUUID() + '.tmp';
       try {
-        fs.writeFileSync(temporary, Buffer.from(base64, 'base64'), { flag: 'wx' });
-        if (!fs.existsSync(file)) fs.renameSync(temporary, file);
+        fs.writeFileSync(temporary, bytes, { flag: 'wx' });
+        fs.renameSync(temporary, file);
       } catch (error) {
         console.warn('[eh] 动作素材安装失败：' + name, error.message);
       } finally {
@@ -45,7 +48,7 @@ function installCompanion() {
     const now = new Date();
     return [now.getFullYear(), now.getMonth() + 1, now.getDate()].join('-');
   };
-  const optionalNames = ['蹲下', '打哈欠', '吃炸鸡腿', '吃蛋糕', '特殊喝水', '待机（桌面弹弓）'];
+  const optionalNames = ['深度思考ing', '看手机', '蹲下', '打哈欠', '吃炸鸡腿', '吃蛋糕', '特殊喝水', '待机（桌面弹弓）'];
   const hasMedia = name => fs.existsSync(path.join(data, 'pet', 'eh-animation', name + '.webm'));
   const weatherFetch = (url, signal) => (net?.fetch ? net.fetch(url, {signal}) : fetch(url, {signal}));
   const mining = new WeakMap();
@@ -144,7 +147,7 @@ function installCompanion() {
       if (action === 'pet-item-action') {
         if (snack && snack.food.use === input && shopRequest('shop-status').wallet[snack.food.item] <= 1)
           throw new Error('这份食物正在被偷吃');
-        const name = { chicken:'吃炸鸡腿', cake:'吃蛋糕' }[input];
+        const name = { chicken:'吃炸鸡腿', cake:'吃蛋糕', catTicket:'撸猫' }[input];
         if (name && !hasMedia(name)) throw new Error('这个进食动作还没有素材，食物已保留');
         return shopRequest(action, input);
       }

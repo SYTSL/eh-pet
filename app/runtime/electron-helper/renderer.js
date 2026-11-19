@@ -44,7 +44,7 @@ async function loadConfig() {
     const { available = [] } = await window.petBridge.companionRequest('optional-media').catch(() => ({}));
     for (const pet of eh) {
       const { clicks, categories = [] } = pet.animations;
-      const extra = ['蹲下', '打哈欠'].filter(name => available.includes(name));
+      const extra = ['蹲下', '打哈欠', '深度思考ing'].filter(name => available.includes(name));
       pet.animations = { ...pet.animations, clicks: clicks.filter(name => name !== '眯一会'),
         categories: extra.length ? [...categories, { id: '待机扩展', weight: 100, actions: extra }] : categories };
     }

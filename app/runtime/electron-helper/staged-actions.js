@@ -2,10 +2,11 @@
 (() => {
  const P=PetSprite.prototype;
  const switchTo=P.switchTo,playOnce=P.playOnce,playIdle=P.playIdle,ended=P.handleEnded,dispose=P.dispose;
- const names={music:{intro:'music-intro',loop:'music-loop',outro:'music-outro'},drag:{intro:'zhuai-intro',loop:'zhuai-loop',outro:'zhuai-outro'},mine:{intro:'mine-intro',loop:'mine-loop',outro:'mine-outro'}};
+ const names={phone:{intro:'phone-intro',loop:'phone-loop',outro:'phone-outro'},music:{intro:'music-intro',loop:'music-loop',outro:'music-outro'},drag:{intro:'zhuai-intro',loop:'zhuai-loop',outro:'zhuai-outro'},mine:{intro:'mine-intro',loop:'mine-loop',outro:'mine-outro'}};
  P.stagedDesired=function(){
   const audio=this.musicAudio;
   if(audio&&!audio.paused&&!audio.ended&&!audio.error)return 'music';
+  if(this.headMode==='stocks')return 'phone';
   return this.stagedDragging&&this.stagedAction?.kind!=='music'?'drag':null;
  };
  P.stagedPlay=function(kind,phase){
@@ -16,7 +17,7 @@
  P.beginWaterAnimation=function(){
   const action=this.stagedAction;
   if(this.assetRoot!=='eh'||!this.optionalMedia?.includes('特殊喝水')||!action||
-      !['music','mine'].includes(action.kind)||!['intro','loop'].includes(action.phase))return false;
+      !['music','mine','phone'].includes(action.kind)||!['intro','loop'].includes(action.phase))return false;
   this.stagedAction={kind:action.kind,phase:'water-outro'};
   this.stopMove();this.pendingSquash=false;
   switchTo.call(this,names[action.kind].outro,true);
@@ -58,7 +59,7 @@
   }
   if(action.phase==='water-drink'){
    if(completedAnim && completedAnim!=='特殊喝水')return;
-   if(action.kind==='mine'||this.stagedDesired()==='music')this.stagedPlay(action.kind,'intro');
+   if(action.kind==='mine'||this.stagedDesired()===action.kind)this.stagedPlay(action.kind,'intro');
    else {this.stagedAction=null;playIdle.call(this)}
    return;
   }

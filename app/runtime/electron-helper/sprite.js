@@ -710,6 +710,10 @@ class PetSprite {
   }
 
   handleEnded() {
+    if (this.uncatchableSnack === this.gen && this.snackUnclicked) {
+      this.headText('还有吗🌝');
+      this.snackUnclicked = false;
+    }
     // 播放回执：前台视频真的播完了 → 如实回 ended。放在拖拽守卫之前——「播完了」是既成事实，
     // 拖拽守卫管的是动画链怎么推进，不该影响回执的准确性。
     if (this.playback) {
@@ -1163,6 +1167,11 @@ class PetSprite {
   onPointerDown(e) {
     // 只认左键：右键进入拖拽判定会与右键菜单打架
     if (e.button !== 0) return;
+    if (['吃可可果','吃炸鸡腿','吃蛋糕','偷吃','打断鸡腿','打断蛋糕'].includes(this.anim)) {
+      e.preventDefault();
+      this.onClick(e);
+      return;
+    }
     // 占用锁：用户点了或拖了这只宠物 = 用户接管，立刻撤掉第三方占用。这是唯一一处「渲染端 → 宿主」
     // 的锁上报——宿主看不见鼠标，而锁在它手里（/lock/release 的 force 形态）。
     // 先本地解冻再上报：等叶子往返会让宠物「点了半天才动」，而此刻 frozen 为真说明这次释放必然成功。
@@ -1558,13 +1567,25 @@ class PetSprite {
   onClick(e) {
     const d = this.dragState;
     if (d.active || d.dragging || this.justDragged) return;
+    if (this.foodFeedback && this.foodFeedbackGen === this.gen) {
+      this.headText(this.foodFeedback);
+      this.snackUnclicked = false;
+      return true;
+    }
     if (this.snack && !isOpenShortcut(e)) {
+      this.snack.clicked = true;
       if ((this.snack.video?.currentTime ?? 0) < 4) {
         const caught = this.snack.caught;
         this.finishSnack(false);
         this.stopThrow();
         this.stopMove();
         this.playOnce(caught);
+        this.foodFeedback = '☹没吃到';
+        this.foodFeedbackGen = this.gen;
+        this.headText(this.foodFeedback);
+      } else {
+        this.finishSnack(true);
+        this.headText('好吃😊');
       }
       return true;
     }
@@ -1577,7 +1598,12 @@ class PetSprite {
       return;
     }
     // 积分判定已在 onPointerDown（按下即触发）完成：已触发过就只收手停住，不再播普通点击动画
-    if (this.uncatchableSnack === this.gen && !isOpenShortcut(e)) return true;
+    if (this.uncatchableSnack === this.gen && !isOpenShortcut(e)) {
+      this.snackUnclicked = false;
+      this.headText('好吃😊');
+      return true;
+    }
+    if (['吃可可果','吃炸鸡腿','吃蛋糕'].includes(this.anim)) return true;
     if (this.pressScoreFired) {
       this.pressScoreFired = false;
       this.stopThrow();
@@ -1667,7 +1693,7 @@ class PetSprite {
         { label: '对话', action: 'chat' },
       ] },
       { label: '设置', action: 'deepseek-token' },
-      { label: '检查更新（v0.4.11）', action: 'check-update' },
+      { label: '检查更新（v0.4.12）', action: 'check-update' },
       { label: '商店/背包', action: 'shop' },
     );
     if (characters.length) {
